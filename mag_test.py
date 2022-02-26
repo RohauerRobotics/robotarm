@@ -1,4 +1,7 @@
+# https://learn.adafruit.com/circuitpython-on-raspberrypi-linux/installing-circuitpython-on-raspberry-pi
+
 # I2C control of magnetic encoder
+
 import board
 import busio
 import time
