@@ -5,38 +5,67 @@
 import board
 import busio
 import time
+from bitarray import bitarray
 
 i2c = (busio.I2C(board.SCL_1, board.SDA_1, 400))
-data_buffer_in = int(0, 'utf-8')
+time.sleep(1)
 # set up I2C Bus connection == wire.begin
-i2c_address = bytes(0x36, 'utf-8')
+
+def check_magnent():
+    # collects raw angle from
+    data_buffer_in = bytearray(1)
+    print("Checking Magnent Status")
+    while(bytearray.decode(data_buffer_in) != 'g'):
+        data_buffer_in = bytearray(1)
+        mstat_address = bytes([0x0B])
+        i2c.writeto(0x36, mstat_address, stop=False)
+        time.sleep(0.005)
+        i2c.readfrom_into(0x36, data_buffer_in)
+        print("Magnent Status", bytearray.decode(data_buffer_in))
+    print("Magnent Detected")
+    return True
+
+def check_magnent_noprint():
+    # collects raw angle from
+    data_buffer_in = bytearray(1)
+    # print("Checking Magnent Status")
+    while(bytearray.decode(data_buffer_in) != 'g'):
+        data_buffer_in = bytearray(1)
+        mstat_address = bytes([0x0B])
+        i2c.writeto(0x36, mstat_address, stop=False)
+        time.sleep(0.005)
+        i2c.readfrom_into(0x36, data_buffer_in)
+        # print("Magnent Status", bytearray.decode(data_buffer_in))
+    # print("Magnent Detected")
+    return True
+
+def read_angle_raw():
+    angleHigh_buff = bytearray(2)
+    mstat_address = bytes([0x0D])
+    i2c.writeto(0x36, mstat_address, stop=False)
+    time.sleep(0.05)
+    i2c.readfrom_into(0x36, angleHigh_buff)
+    # angleHigh_buff = angleHigh_buff << 8;
+    # print("High angle",angleHigh_buff[1])
+    angleLow_buff = bytearray(2)
+    mstat_address = bytes([0x0C])
+    i2c.writeto(0x36, mstat_address, stop=False)
+    time.sleep(0.05)
+    i2c.readfrom_into(0x36, angleLow_buff)
+    # print("Low angle",angleLow_buff[0])
+    # rawangle = b""
+    # rawangle.join([angleHigh_buff, angleLow_buff])
+    rawangle = int.from_bytes(rawangle, byteorder='big')
+    print(rawangle*0.087890625)
 
 # returns a scan of the i2c pins and prints the board ID
-print(i2c.scan())
+mag_id = i2c.scan()
+print("Id Scan", hex(mag_id[0]))
 check_magnent()
+while(check_magnent_noprint() == True):
+    read_angle_raw()
 # i2c.writeto_then_readfrom(i2c_address, out_buffer: circuitpython_typing.ReadableBuffer,
 # in_buffer: circuitpython_typing.WriteableBuffer, *, out_start: int = 0, out_end: int = sys.maxsize, in_start: int = 0, in_end: int = sys.maxsize)
 
 # run to de initialize the board
 i2c.deinit()
-
-def check_magnent():
-    # collects raw angle from
-    print("Checking Magnent Status")
-    while (data_buffer_in != 32):
-        data_buffer_in = int(0, 'utf-8')
-        mstat_address = bytes(0x0B, 'utf-8')
-        i2c.writeto_then_readfrom(i2c_address, mstat_address: circuitpython_typing.ReadableBuffer,
-        data_buffer_in: circuitpython_typing.WriteableBuffer*, out_start: int = 0, out_end: int = 6)
-        print("Magnent Status", data_buffer_in)
-    print("Magnent Detected")
-
-def read_angle():
-    first_four_bits = int(None, 'utf-8')
-    raw1_address = bytes(0x0D, 'utf-8')
-    i2c.writeto_then_readfrom(i2c_address, raw1_address: circuitpython_typing.ReadableBuffer,
-    first_four_bits: circuitpython_typing.WriteableBuffer*, out_start: int = 0, out_end: int = 6, in_start: int = 0, in_stop: int=3)
-    last_four_bits = int(None, 'utf-8')
-    raw2_address = bytes(0x0C, 'utf-8')
-    i2c.writeto_then_readfrom(i2c_address, raw2_address: circuitpython_typing.ReadableBuffer,
-    first_four_bits: circuitpython_typing.WriteableBuffer*, out_start: int = 0, out_end: int = 6, in_start: int = 4, in_stop: int=7)
