@@ -5,7 +5,7 @@
 import board
 import busio
 import time
-from bitarray import bitarray
+import struct
 
 i2c = (busio.I2C(board.SCL_1, board.SDA_1, 400))
 time.sleep(1)
@@ -52,11 +52,14 @@ def read_angle_raw():
     i2c.writeto(0x36, mstat_address, stop=False)
     time.sleep(0.05)
     i2c.readfrom_into(0x36, angleLow_buff)
-    # print("Low angle",angleLow_buff[0])
-    # rawangle = b""
-    # rawangle.join([angleHigh_buff, angleLow_buff])
-    rawangle = int.from_bytes(rawangle, byteorder='big')
-    print(rawangle*0.087890625)
+    high = angleHigh_buff[1:2]
+    low = angleLow_buff[1:2]
+    # print(high)
+    rawangle = struct.pack('cc',bytes(high),bytes(low))
+    # rawangle.append(int(bytes(angleLow_buff[1:2])))
+    # print(low)
+    int_angle = int.from_bytes(rawangle,"big")
+    print(int_angle*0.087890625)
 
 # returns a scan of the i2c pins and prints the board ID
 mag_id = i2c.scan()
