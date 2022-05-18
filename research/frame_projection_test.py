@@ -3,7 +3,7 @@ import numpy as np
 angle1 = 45
 angle2 = 0
 angle3 = 0
-angle4 = 0
+angle4 = 45
 
 l1 = 0.150
 l2 = 0.200
@@ -32,9 +32,9 @@ r_de = R_y(angle3)
 
 # displacement matricies
 d_ab = [[0],[0],[0]]
-d_bc = [[np.cos(np.radians(angle1))*l1],[0],[np.sin(np.radians(angle1))*l1]]
-d_cd = [[np.cos(np.radians(angle2))*l2],[0],[np.sin(np.radians(angle2))*l2]]
-d_de = [[np.cos(np.radians(angle3))*l3],[0],[np.sin(np.radians(angle3))*l3]]
+d_bc = [[np.sin(np.radians(angle1))*l1],[0],[np.cos(np.radians(angle1))*l1]]
+d_cd = [[np.sin(np.radians(angle2))*l2],[0],[np.cos(np.radians(angle2))*l2]]
+d_de = [[np.sin(np.radians(angle3))*l3],[0],[np.cos(np.radians(angle3))*l3]]
 # matricies = [r_ab, r_bc, r_cd, r_de]
 # homogenous transfer matricies
 h_ab = np.concatenate((r_ab,d_ab),1)
@@ -52,10 +52,10 @@ h_de = np.concatenate((h_de,[[0,0,0,1]]),0)
 h_ac = np.dot(h_ab, h_bc)
 print("\n x: ", round(h_ac[0][3],3), "y: ", round(h_ac[1][3],3), "z: ", round(h_ac[2][3],3))
 
-h_ce = np.dot(h_cd, h_de)
-print("\n x: ", round(h_ce[0][3],3), "y: ", round(h_ce[1][3],3), "z: ", round(h_ce[2][3],3))
+h_ad = np.dot(h_ac, h_cd)
+# print("\n x: ", round(h_ce[0][3],3), "y: ", round(h_ce[1][3],3), "z: ", round(h_ce[2][3],3))
 
-h_ae = np.dot(h_ac, h_ce)
+h_ae = np.dot(h_ad, h_de)
 # h_ae = np.dot(h_ad, h_de)
 # r_ae = np.dot(r_ab, r_bc, r_cd, r_de)
 
