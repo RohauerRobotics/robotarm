@@ -11,10 +11,11 @@ class Path(object):
     def __init__(self, inital_angles,lengths_m):
         self.values = {"iA":inital_angles, "len":lengths_m,
         # define stepper settings
-        "micro_steps":200, "w_max": np.pi, "accel":np.pi/8}
+        "micro_steps":200, "w_max": np.pi, "accel":np.pi/8
+        }
         # print("inital angles:\n", np.matrix(self.values['iA']))
         # print("lengths:\n", np.matrix(self.values['len']))
-        final = self.inverse_kinematics([0.15,.3,0.1])
+        final = self.inverse_kinematics([0.15,0.1,0.1])
         self.path, theta = self.animation_path(self.values['iA'],final)
         print(self.step_path)
         print(theta)
@@ -174,10 +175,16 @@ class Path(object):
         # print(self.stepper_times)
 
 class Plot(object):
-    def __init__(self, path, lengths_m):
+    def __init__(self, path, lengths_m,inital_angles):
+        self.values = {"iA":inital_angles, "len":lengths_m,
+        # define stepper settings
+        "micro_steps":200, "w_max": np.pi, "accel":np.pi/8,
+        "mass": [0.15,0.2,0.4]
+        }
         self.l1 = lengths_m[0]
         self.l2 = lengths_m[1]
         self.l3 = lengths_m[2]
+        self.mass = [0.4,0.3,0.2]
         plt.ion()
         self.fig = plt.figure()
         self.ax = p3.Axes3D(self.fig)
@@ -192,10 +199,12 @@ class Plot(object):
         self.ax.set_zlabel('Z')
         #
         self.ax.set_title('3D Test')
-        set = [[[],[]],[[],[]],[[],[]]]
+        set = [[[],[]],[[],[]],[[],[]],[[],[]]]
         self.line0, = self.ax.plot(set[0][0], set[0][1], 'bo', linestyle='solid')
         self.line1, = self.ax.plot(set[1][0], set[1][1], 'bo', linestyle='solid')
         self.line2, = self.ax.plot(set[2][0], set[2][1], 'bo', linestyle='solid')
+        self.line3, = self.ax.plot(set[3][0], set[3][1], 'bo', linestyle='solid', color='red')
+        # self.torque_path()
         for x in range(0,10):
             self.loop(path)
 
@@ -243,11 +252,30 @@ class Plot(object):
         h_de = np.concatenate((r_de,d_de),1)
         h_de = np.concatenate((h_de,[[0,0,0,1]]),0)
         h_ac = np.dot(h_ab, h_bc)
+        self.h_ac = h_ac
         h_ad = np.dot(h_ac, h_cd)
+        self.h_ad = h_ad
         h_ae = np.dot(h_ad, h_de)
+        self.h_ae = h_ae
+        self.torque_path()
         return [[[0,h_ac[0][3]],[0,h_ac[1][3]],[0,h_ac[2][3]]],
         [[h_ac[0][3],h_ad[0][3]],[h_ac[1][3],h_ad[1][3]],[h_ac[2][3],h_ad[2][3]]]
         ,[[h_ad[0][3],h_ae[0][3]],[h_ad[1][3],h_ae[1][3]],[h_ad[2][3],h_ae[2][3]]]]
+
+    def torque_path(self):
+        self.orgin_t = [0,0,0]
+        t1 = np.cross([self.h_ac[0][3],self.h_ac[1][3],self.h_ac[2][3]],[0,0,9.81*self.values["mass"][0]])
+        # print("torque \n",np.matrix(t1))
+        t2 = np.cross([self.h_ad[0][3],self.h_ad[1][3],self.h_ad[2][3]],[0,0,9.81*self.values["mass"][1]])
+        # print("torque \n",np.matrix(t2))
+        t3 = np.cross([self.h_ae[0][3],self.h_ae[1][3],self.h_ae[2][3]],[0,0,9.81*self.values["mass"][2]])
+        # print("torque \n",np.matrix(t3))
+        for x in range(0,3):
+            self.orgin_t[x] = round(t1[x] + t2[x] + t3[x],3)
+        # print("torque \n",np.matrix(self.orgin_t))
+
+        print("Torque Magnitude:",round(np.sqrt((self.orgin_t[0]**2)+(self.orgin_t[1]**2)+(self.orgin_t[2]**2)),3),"Nm")
+
 
     def loop(self, path):
         for x in range(0, len(path[0])):
@@ -265,6 +293,7 @@ class Plot(object):
             # xyz2 = line_data(path[2][x],path[3][x],values['arm_lengths_milimeters'][2],xyz1)
             self.line2.set_data_3d(np.dot(lines[2][0],1000),np.dot(lines[2][1],1000),np.dot(lines[2][2],1000))
             # print(np.dot(lines[2][0],1000),np.dot(lines[2][1],1000),np.dot(lines[2][2],1000),"\n")
+            self.line3.set_data_3d(np.dot([0,self.orgin_t[0]],1000),np.dot([0,self.orgin_t[1]],1000),np.dot([0,self.orgin_t[2]],1000))
             # path of end effector
             # for w in range(0,3):
             #     pts[w].append(xyz2[w])
@@ -276,4 +305,4 @@ class Plot(object):
 
 bob = Path([0,0,0,0.0],[0.20, 0.150, 0.050])
 print(bob.path)
-plot = Plot(bob.path,[0.20, 0.150, 0.050])
+plot = Plot(bob.path,[0.20, 0.150, 0.050],[0,0,0,0.0])
