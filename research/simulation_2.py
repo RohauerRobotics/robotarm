@@ -1,4 +1,4 @@
-# simulation test 2
+  # simulation test 2
 import matplotlib.pyplot as plt
 # from matplotlib.pyplot import figure
 import csv
@@ -6,6 +6,7 @@ import numpy as np
 import time
 import mpl_toolkits.mplot3d.axes3d as p3
 from mpl_toolkits import mplot3d
+import math
 
 class Path(object):
     def __init__(self, inital_angles,lengths_m):
@@ -15,7 +16,7 @@ class Path(object):
         }
         # print("inital angles:\n", np.matrix(self.values['iA']))
         # print("lengths:\n", np.matrix(self.values['len']))
-        final = self.inverse_kinematics([0.15,0.1,0.1])
+        final = self.inverse_kinematics([0.15,-0.1,0.1])
         self.path, theta = self.animation_path(self.values['iA'],final)
         print(self.step_path)
         print(theta)
@@ -78,7 +79,7 @@ class Path(object):
                 angle4 = 0
             elif x != 0:
                 angle4 = np.arctan(y/x)
-            # print(np.degrees(angle1),np.degrees(angle2),np.degrees(angle3),np.degrees(angle4))
+            print(np.degrees(angle1),np.degrees(angle2),np.degrees(angle3),np.degrees(angle4))
             return [np.degrees(angle1),np.degrees(angle2),np.degrees(angle3),np.degrees(angle4)]
         else:
             pass
@@ -89,7 +90,14 @@ class Path(object):
         self.step_path = [[],[],[],[]]
         for w in range(0, 4):
             couple = [final[w],inital[w]]
-            # print(couple)
+            abs_couple = [abs(final[w]),abs(inital[w])]
+            if final[w] == 0:
+                abs_couple[0] = 0
+            elif inital[w] == 0:
+                abs_couple[1] = 0
+            else:
+                pass
+            print(abs_couple)
             # adjust values if outside range
             if(inital[w])>360:
                 inital[w] = inital[w]-360
@@ -102,9 +110,9 @@ class Path(object):
             else:
                 pass
             # determine shortest number of steps between angles
-            if (abs(final[w]-inital[w]) > 180):
+            if (abs(couple[0]-couple[1]) > 180):
                 negative_max = abs(max(couple) - 360)
-                steps = negative_max + min(couple)
+                steps = negative_max + min(abs_couple)
                 theta[w] = round(np.radians(steps),3)
                 steps = int(steps)
                 if inital[w] == max(couple):
@@ -114,34 +122,42 @@ class Path(object):
                 elif final[w] == max(couple):
                     for x in range(0, steps):
                         path[w].append(inital[w]-x)
+                    # print("correct path", w)
                     self.step_path[w].append(False)
                 else:
-                    print("error")
+                    print("error 1", w)
 
-            elif (abs(final[w]-inital[w]) <= 180):
-                steps = max(couple) - min(couple)
+            elif (abs(couple[0]-couple[1]) <= 180):
+                steps = max(abs_couple) - min(abs_couple)
                 theta[w] = round(np.radians(steps),3)
                 steps = int(steps)
+                # inital
                 if inital[w] == max(couple):
                     for x in range(0, steps):
                         path[w].append(inital[w]-x)
+                    print("correct path", w)
                     self.step_path[w].append(False)
+                # final
                 elif final[w] == max(couple):
                     for x in range(0, steps):
                         path[w].append(inital[w]+x)
                     self.step_path[w].append(True)
                 else:
-                    print("error")
+                    print("error 2")
             else:
+                print("Passed List")
                 pass
-
             if (final[w]==inital[w]):
                 path[w].append(0)
+                print("appended 0")
                 theta[w] = 0
             else:
                 pass
 
         list_len = [len(i) for i in path]
+        print("Path Length: ",path)
+        self.dir = [self.step_path[i][0] for i in range(0,4)]
+        self.theta = theta
         for w in range(0, len(path)):
             path[w].extend([path[w][-1]]*(max(list_len)-len(path[w])))
         return path, theta
@@ -175,7 +191,7 @@ class Path(object):
         # print(self.stepper_times)
 
 class Plot(object):
-    def __init__(self, path, lengths_m,inital_angles):
+    def __init__(self, path, lengths_m,inital_angles,dir,theta,step_times):
         self.values = {"iA":inital_angles, "len":lengths_m,
         # define stepper settings
         "micro_steps":200, "w_max": np.pi, "accel":np.pi/8,
@@ -185,6 +201,9 @@ class Plot(object):
         self.l2 = lengths_m[1]
         self.l3 = lengths_m[2]
         self.mass = [0.4,0.3,0.2]
+        self.dir = dir
+        self.theta = theta
+        self.step_times = step_times
         plt.ion()
         self.fig = plt.figure()
         self.ax = p3.Axes3D(self.fig)
@@ -199,11 +218,13 @@ class Plot(object):
         self.ax.set_zlabel('Z')
         #
         self.ax.set_title('3D Test')
-        set = [[[],[]],[[],[]],[[],[]],[[],[]]]
+        set = [[[],[]],[[],[]],[[],[]],[[],[]],[[],[]],[[],[]]]
         self.line0, = self.ax.plot(set[0][0], set[0][1], 'bo', linestyle='solid')
         self.line1, = self.ax.plot(set[1][0], set[1][1], 'bo', linestyle='solid')
         self.line2, = self.ax.plot(set[2][0], set[2][1], 'bo', linestyle='solid')
         self.line3, = self.ax.plot(set[3][0], set[3][1], 'bo', linestyle='solid', color='red')
+        self.line4, = self.ax.plot(set[4][0], set[4][1], 'bo', linestyle='solid', color='red')
+        self.line5, = self.ax.plot(set[5][0], set[5][1], 'bo', linestyle='solid', color='red')
         # self.torque_path()
         for x in range(0,10):
             self.loop(path)
@@ -220,13 +241,18 @@ class Plot(object):
         rad = np.radians(angle)
         return [[np.cos(rad),-np.sin(rad),0],[np.sin(rad),np.cos(rad),0],[0,0,1]]
 
+    def magnitude(self,vector):
+        return math.sqrt(sum(pow(element, 2) for element in vector))
+
     def position(self, angles):
         angle1 = angles[0]
+        self.angle1 = np.radians(angle1)
         angle2 = angles[1]
         angle3 = angles[2]
         angle4 = angles[3]
         # rotation matrices
         r_ab = self.R_z(angle4)
+        self.r_ab = r_ab
         # print("ab rotation:\n",np.matrix(r_ab))
         r_bc = self.R_y(angle1)
         # print("bc rotation:\n",np.matrix(r_bc))
@@ -248,9 +274,21 @@ class Plot(object):
         #
         h_cd = np.concatenate((r_cd,d_cd),1)
         h_cd = np.concatenate((h_cd,[[0,0,0,1]]),0)
+
+        r_ac = np.dot(r_ab,r_bc)
+        # # print("r_ac dot product: "np.matrix(r_ac)))
+        # self.h_cd = np.concatenate((r_ac,d_cd),1)
+        # self.h_cd = np.concatenate((self.h_cd,[[0,0,0,1]]),0)
+        # # r_ae = np.dot(r_ac,r_de)
+        # self.h_de = np.concatenate((r_de,d_de),1)
+        # self.h_de = np.concatenate((self.h_de,[[0,0,0,1]]),0)
+        # self.h_ce = np.dot(self.h_cd,self.h_de)
         # #
         h_de = np.concatenate((r_de,d_de),1)
         h_de = np.concatenate((h_de,[[0,0,0,1]]),0)
+        #
+        # self.h_ce = np.dot(h_cd,h_de)
+
         h_ac = np.dot(h_ab, h_bc)
         self.h_ac = h_ac
         h_ad = np.dot(h_ac, h_cd)
@@ -262,47 +300,102 @@ class Plot(object):
         [[h_ac[0][3],h_ad[0][3]],[h_ac[1][3],h_ad[1][3]],[h_ac[2][3],h_ad[2][3]]]
         ,[[h_ad[0][3],h_ae[0][3]],[h_ad[1][3],h_ae[1][3]],[h_ad[2][3],h_ae[2][3]]]]
 
-    def torque_path(self):
+    def motor1_torque(self):
         self.orgin_t = [0,0,0]
-        t1 = np.cross([self.h_ac[0][3],self.h_ac[1][3],self.h_ac[2][3]],[0,0,9.81*self.values["mass"][0]])
-        # print("torque \n",np.matrix(t1))
-        t2 = np.cross([self.h_ad[0][3],self.h_ad[1][3],self.h_ad[2][3]],[0,0,9.81*self.values["mass"][1]])
-        # print("torque \n",np.matrix(t2))
-        t3 = np.cross([self.h_ae[0][3],self.h_ae[1][3],self.h_ae[2][3]],[0,0,9.81*self.values["mass"][2]])
-        # print("torque \n",np.matrix(t3))
-        for x in range(0,3):
-            self.orgin_t[x] = round(t1[x] + t2[x] + t3[x],3)
-        # print("torque \n",np.matrix(self.orgin_t))
+        current_time = (self.step_times[0]/self.path_len)*self.x
+        #
+        ac = [self.h_ac[0][3],self.h_ac[1][3],self.h_ac[2][3]]
+        tg1 = np.cross(ac,[0,0,9.81*self.values["mass"][0]])
+        #
+        tm1 = np.cross(ac,[(-np.cos(self.angle1)*self.magnitude(ac)*(np.pi/8)*self.values["mass"][0]),
+        0, (np.sin(self.angle1)*self.magnitude(ac)*(np.pi/8)*self.values["mass"][0])])
+        #
+        ad = [self.h_ad[0][3],self.h_ad[1][3],self.h_ad[2][3]]
+        tg2 = np.cross(ad,[0,0,9.81*self.values["mass"][1]])
 
-        print("Torque Magnitude:",round(np.sqrt((self.orgin_t[0]**2)+(self.orgin_t[1]**2)+(self.orgin_t[2]**2)),3),"Nm")
+        tm2 = np.cross(ad,[(-np.cos(self.angle1)*self.magnitude(ad)*(np.pi/8)*self.values["mass"][1]),
+        0, (np.sin(self.angle1)*self.magnitude(ad)*(np.pi/8)*self.values["mass"][1])])
+        #
+        ae = [self.h_ae[0][3],self.h_ae[1][3],self.h_ae[2][3]]
+        tg3 = np.cross(ae,[0,0,9.81*self.values["mass"][2]])
+        #
+        tm3 = np.cross(ae,[(-np.cos(self.angle1)*self.magnitude(ae)*(np.pi/8)*self.values["mass"][2]),
+        0, (np.sin(self.angle1)*self.magnitude(ae)*(np.pi/8)*self.values["mass"][2])])
+        #
+        for x in range(0,3):
+            self.orgin_t[x] = round(tg1[x] + tg2[x] + tg3[x]+tm1[x] + tm2[x] + tm3[x],3)
+
+    def motor2_torque(self):
+        self.motor2_t = [0,0,0]
+        current_time = (self.step_times[0]/self.path_len)*self.x
+        #
+        cd = [self.h_ad[0][3]-self.h_ac[0][3],self.h_ad[1][3]-self.h_ac[1][3],self.h_ad[2][3]-self.h_ac[2][3]]
+        tg2 = np.cross(cd,[0,0,9.81*self.values["mass"][1]])
+        #
+        tm2 = np.cross(cd,[(-np.cos(self.angle1)*self.magnitude(cd)*(np.pi/8)*self.values["mass"][1]),
+        0, (np.sin(self.angle1)*self.magnitude(cd)*(np.pi/8)*self.values["mass"][1])])
+        #
+        ce = [self.h_ae[0][3]-self.h_ac[0][3],self.h_ae[1][3]-self.h_ac[1][3],self.h_ae[2][3]-self.h_ac[2][3]]
+        tg3 = np.cross(ce,[0,0,9.81*self.values["mass"][2]])
+
+        tm3 = np.cross(ce,[(-np.cos(self.angle1)*self.magnitude(ce)*(np.pi/8)*self.values["mass"][2]),
+        0, (np.sin(self.angle1)*self.magnitude(ce)*(np.pi/8)*self.values["mass"][2])])
+
+        for x in range(0,3):
+            self.motor2_t[x] = round(tg2[x] + tg3[x] + tm2[x] + tm3[x],3)
+
+    def motor3_torque(self):
+        self.motor3_t = [0,0,0]
+        current_time = (self.step_times[0]/self.path_len)*self.x
+        #
+        de = [self.h_ae[0][3]-self.h_ad[0][3],self.h_ae[1][3]-self.h_ad[1][3],self.h_ae[2][3]-self.h_ad[2][3]]
+        tg3 = np.cross(de,[0,0,9.81*self.values["mass"][2]])
+        #
+        tm3 = np.cross(de,[(-np.cos(self.angle1)*self.magnitude(de)*(np.pi/8)*self.values["mass"][2]),
+        0, (np.sin(self.angle1)*self.magnitude(de)*(np.pi/8)*self.values["mass"][2])])
+        #
+        for x in range(0,3):
+            self.motor3_t[x] = round(tg3[x] + tm3[x],3)
+
+    def torque_path(self):
+        self.motor1_torque()
+        self.motor2_torque()
+        self.motor3_torque()
+        #
+        # print("Motor 1 Torque Magnitude:",round(np.sqrt((self.orgin_t[0]**2)+(self.orgin_t[1]**2)+(self.orgin_t[2]**2)),3),"Nm")
+        # print("Motor 2 Torque Magnitude:",round(np.sqrt((self.motor2_t[0]**2)+(self.motor2_t[1]**2)+(self.motor2_t[2]**2)),3),"Nm")
+        # print("Motor 3 Torque Magnitude:",round(np.sqrt((self.motor3_t[0]**2)+(self.motor3_t[1]**2)+(self.motor3_t[2]**2)),3),"Nm")
 
 
     def loop(self, path):
-        for x in range(0, len(path[0])):
+        self.path_len = len(path[0])
+        for self.x in range(0, len(path[0])):
             # line 1
-            lines = self.position([path[0][x], path[1][x], path[2][x], path[3][x]])
-            # xyz0 = line_data(path[0][x],path[3][x],values['arm_lengths_milimeters'][0],[0,0,0])
-            self.line0.set_data_3d(np.dot(lines[0][0],1000),np.dot(lines[0][1],1000),np.dot(lines[0][2],1000))
-            # print(lines[0][0]*1000,lines[0][1]*1000,lines[0][2]*1000,"\n")
-            # line 2
-            # xyz1 = line_data(path[1][x],path[3][x],values['arm_lengths_milimeters'][1],xyz0)
-            self.line1.set_data_3d(np.dot(lines[1][0],1000),np.dot(lines[1][1],1000),np.dot(lines[1][2],1000))
-            # print(np.dot(lines[1][0],1000),np.dot(lines[1][1],1000),np.dot(lines[1][2],1000),"\n")
-            # print(lines[1][0]*1000,lines[1][1]*1000,lines[1][2]*1000,"\n")
-            # line 3
-            # xyz2 = line_data(path[2][x],path[3][x],values['arm_lengths_milimeters'][2],xyz1)
-            self.line2.set_data_3d(np.dot(lines[2][0],1000),np.dot(lines[2][1],1000),np.dot(lines[2][2],1000))
-            # print(np.dot(lines[2][0],1000),np.dot(lines[2][1],1000),np.dot(lines[2][2],1000),"\n")
-            self.line3.set_data_3d(np.dot([0,self.orgin_t[0]],1000),np.dot([0,self.orgin_t[1]],1000),np.dot([0,self.orgin_t[2]],1000))
+            lines = self.position([path[0][self.x], path[1][self.x], path[2][self.x], path[3][self.x]])
+            # scale for model
+            scale = 1000
+            self.line0.set_data_3d(np.dot(lines[0][0],scale),np.dot(lines[0][1],scale),np.dot(lines[0][2],scale))
+            #
+            self.line1.set_data_3d(np.dot(lines[1][0],scale),np.dot(lines[1][1],scale),np.dot(lines[1][2],scale))
+            #
+            self.line2.set_data_3d(np.dot(lines[2][0],scale),np.dot(lines[2][1],scale),np.dot(lines[2][2],scale))
+            #
+            self.line3.set_data_3d(np.dot([0,self.orgin_t[0]],scale),np.dot([0,self.orgin_t[1]],scale),np.dot([0,self.orgin_t[2]],scale))
+            #
+            self.line4.set_data_3d(np.dot([lines[1][0][0],self.motor2_t[0]+lines[1][0][0]],scale),np.dot([lines[1][1][0],self.motor2_t[1]+lines[1][1][0]],scale),
+            np.dot([lines[1][2][0],self.motor2_t[2]+lines[1][2][0]],scale))
+            #
+            self.line5.set_data_3d(np.dot([lines[2][0][0],self.motor3_t[0]+lines[2][0][0]],scale),np.dot([lines[2][1][0],self.motor3_t[1]+lines[2][1][0]],scale),
+            np.dot([lines[2][2][0],self.motor3_t[2]+lines[2][2][0]],scale))
+            # print("x: ",self.magnitude(np.dot([lines[1][0][0],self.motor2_t[0]],1000)))
+            # print("y: ",self.magnitude(np.dot([lines[1][1][0],self.motor2_t[1]],1000)))
+            # print("z: ",self.magnitude(np.dot([lines[1][2][0],self.motor2_t[2]],1000)))
             # path of end effector
-            # for w in range(0,3):
-            #     pts[w].append(xyz2[w])
-            # dots.set_data_3d(pts[0],pts[1],pts[2])
             self.fig.canvas.draw()
             self.fig.canvas.flush_events()
             time.sleep(0.0001)
-            # pts = [[],[],[]]
 
 bob = Path([0,0,0,0.0],[0.20, 0.150, 0.050])
-print(bob.path)
-plot = Plot(bob.path,[0.20, 0.150, 0.050],[0,0,0,0.0])
+
+print("Times collected:", bob.stepper_times)
+plot = Plot(bob.path,[0.20, 0.150, 0.050],[0,0,0,0.0],bob.dir,bob.theta,bob.stepper_times)
