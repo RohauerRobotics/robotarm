@@ -21,9 +21,14 @@ class Path(object):
       }
 
   def find_path_to(self, goal):
-      final, bool = self.inverse_kinematics(goal)
+      if goal != None:
+          final, bool = self.inverse_kinematics(goal)
+      elif goal == None:
+          bool = False
+      else:
+          pass
       if bool:
-          print("Angles: ", final)
+          # print("Angles: ", final)
           self.path, theta = self.animation_path(self.values['iA'],final)
           self.stepper_path(theta)
       else:
@@ -40,14 +45,15 @@ class Path(object):
       l1 = self.values['len'][0]
       l2 = self.values['len'][1]
       # h length of triangle
-      h = np.sqrt((x**2 + z**2))
+      w = np.sqrt((x**2 + y**2))
+      h = np.sqrt((w**2 + z**2))
       print("Distance to object:",h)
       # print("hypotenuse", h)
       #
-      if h > np.sqrt((l1**2 + l2**2)):
+      if h > (l1+l2):
           print("Unable to reach")
           bool = False
-      elif h <= np.sqrt((l1**2 + l2**2)):
+      elif h <= (l1+l2):
           print("Able to Reach")
           bool = True
       else:
@@ -67,14 +73,15 @@ class Path(object):
               phi2 = np.arccos((l2**2+l1**2-h**2)/(2*l2*l1))
               # print("phi 2: ",np.degrees(phi2))
           # avoid divide by 0 error
-          if x != 0:
-              phi4 = np.arctan(abs(z)/abs(x))
+          if w != 0:
+              phi4 = np.arctan(abs(z)/abs(w))
               # print("phi 4: ",np.degrees(phi4))
-          elif x == 0:
+          elif w == 0:
               phi4 = (np.pi/2)
           else:
               pass
           # angles for postion finder
+          print("Phi 1, 2, 4: ",np.degrees(phi1),",",np.degrees(phi2),",",np.degrees(phi4))
           # print("angle relative to x axis",np.degrees(phi1+phi4))
           angle1 = (np.pi/2)- (phi4 + phi1)
           angle2 = np.pi - phi2
@@ -91,7 +98,7 @@ class Path(object):
                   angle4 = np.arctan(y/x) + np.pi
               else:
                   angle4 = np.arctan(y/x)
-          # print("Angles:",np.degrees(angle1),np.degrees(angle2),np.degrees(angle3),np.degrees(angle4))
+          print("Angles:",np.degrees(angle1),np.degrees(angle2),np.degrees(angle3),np.degrees(angle4))
           path= [np.degrees(angle1),np.degrees(angle2),np.degrees(angle3),np.degrees(angle4)]
       else:
           pass
@@ -104,6 +111,8 @@ class Path(object):
       for w in range(0, 4):
           couple = [final[w],inital[w]]
           abs_couple = [abs(final[w]),abs(inital[w])]
+          print("Initial Angles: ", couple)
+          print("Abs Couple", abs_couple)
           if final[w] == 0:
               abs_couple[0] = 0
           elif inital[w] == 0:
@@ -125,39 +134,43 @@ class Path(object):
           # determine shortest number of steps between angles
           if (abs(couple[0]-couple[1]) > 180):
               negative_max = abs(max(couple) - 360)
-              steps = negative_max + min(abs_couple)
-              theta[w] = round(np.radians(steps),3)
-              steps = int(steps)
+              angle = negative_max + min(abs_couple)
+              theta[w] = round(np.radians(angle),3)
+              steps = int(angle)
               if inital[w] == max(couple):
-                  for x in range(0, steps):
-                      path[w].append(inital[w]+x)
+                  # print("Step A")
+                  for x in range(0, steps+1):
+                      path[w].append(inital[w]+(x*(angle/steps)))
                   self.step_path[w].append(True)
               elif final[w] == max(couple):
-                  for x in range(0, steps):
-                      path[w].append(inital[w]-x)
+                  # print("Step B")
+                  for x in range(0, steps+1):
+                      path[w].append(inital[w]-(x*(angle/steps)))
                   # print("correct path", w)
                   self.step_path[w].append(False)
               else:
                   print("error 1", w)
 
           elif (abs(couple[0]-couple[1]) <= 180):
-              steps = max(abs_couple) - min(abs_couple)
-              theta[w] = round(np.radians(steps),3)
-              steps = int(steps)
+              angle = max(abs_couple) - min(abs_couple)
+              theta[w] = round(np.radians(angle),3)
+              steps = int(angle)
               # inital
               if inital[w] == max(couple):
-                  for x in range(0, steps):
-                      path[w].append(inital[w]-x)
+                  # print("Step C")
+                  for x in range(0, steps+1):
+                      path[w].append(inital[w]-(x*(angle/steps)))
                   # print("correct path", w)
                   self.step_path[w].append(False)
               # final
               elif final[w] == max(couple):
+                  # print("Step D")
                   # print("Number of Steps:", steps)
                   # print("Path :", w)
                   # print("inital", inital[w])
                   # print("path", path[w])
-                  for x in range(0, steps):
-                      path[w].append(inital[w]+x)
+                  for x in range(0, steps+1):
+                      path[w].append(inital[w]+(x*(angle/steps)))
                   self.step_path[w].append(True)
               else:
                   print("error 2")
@@ -303,6 +316,10 @@ class Features(object):
         self.class_lib_sides = {'remote':4,'suitcase':4,
         "laptop":4,"keyboard":4,"cell phone":4,"book":4}
 
+    def R_z(self, angle):
+        rad = np.radians(angle)
+        return [[np.cos(rad),-np.sin(rad),0],[np.sin(rad),np.cos(rad),0],[0,0,1]]
+
     def pass_filter_variables(self, image, object_info, state_info):
         self.img = image
         # declare variables used to sort filters
@@ -314,9 +331,9 @@ class Features(object):
         # define number of sides
         self.object_sides = self.retrive_sides(self.object_name)
         # declare variables used to postion arm relative to object
-        self.end_effector_xyz = state_info['xyz']
-        self.base_rotation = state_info['angle4']
-        self.end_effector_rotation = state_info['angle5']
+        self.xyz = state_info['xyz']
+        self.angle4 = state_info['angle4']
+        self.angle5 = state_info['angle5']
         self.ultrasonic_height = state_info['ultra_h']
         # slope of h/x & h/y
         self.mx = state_info['m_hx']
@@ -359,6 +376,53 @@ class Features(object):
         img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
         return img
 
+    def scale_points(self, rectangles, boxes):
+        pts = []
+        kx = 1.414
+        ky = 1.53
+        print("self.xyz", self.xyz)
+        h = self.xyz[2]-self.ultrasonic_height
+        print("Rectangles[0]",rectangles[0])
+        print("Rectangles[0][0]",rectangles[0][0])
+        print("Rectangles[0][0][0]",rectangles[0][0][0])
+        center = [((rectangles[0][0][0]-640)*kx)/1000, ((-rectangles[0][0][1]+360)*ky)/1000, h]
+        print("/nRectangle Center: ", center)
+        pts.append(center)
+        # estimated values found from bounding box while camera was on top of board
+        print("Boxes[0]",boxes[0])
+        print("Boxes[0][0]",boxes[0][0])
+        print("Boxes[0][0][0]",boxes[0][0][0])
+        pts.append([[((boxes[0][0][0]-640)*kx)/1000,((boxes[0][1][0]-640)*kx)/1000,((boxes[0][2][0]-640)*kx)/1000,((boxes[0][3][0]-640)*kx)/1000],
+        [((-boxes[0][0][1]+360)*ky)/1000,((-boxes[0][1][1]+360)*ky)/1000,((-boxes[0][2][1]+360)*ky)/1000,((-boxes[0][3][1]+360)*ky)/1000],
+        [h,h,h,h]])
+        return pts
+
+    def xyz_reframe(self, pts):
+        # define homogenous transfer matricies
+        h = self.xyz[2]-self.ultrasonic_height
+        r_ab = self.R_z(self.angle4)
+        r_bf = self.R_z(self.angle5)
+        d_af = [[self.xyz[0]],[self.xyz[1]], [h]]
+        r_af = np.dot(r_ab,r_bf)
+        h_af = np.concatenate((r_af,d_af),1)
+        h_af = np.concatenate((h_af,[[0,0,0,1]]),0)
+        center = [h_af[0][3],h_af[1][3],h_af[2][3]]
+        # define no rotation matrix
+        # r_fx = [[1,1,1],[1,1,1],[1,1,1]]
+        # d_fc = [[pts[0][0]],[pts[0][1]],[0]]
+        # h_fc = np.concatenate((r_fx,d_fc),1)
+        # h_fc = np.concatenate((h_fc,[[0,0,0,1]]),0)
+        # h_ac = np.dot(h_af,h_fc)
+        # xyz = [h_ac[0][3],h_ac[1][3],h_ac[2][3]]
+        # try adding displacment vectors to see difference from concatonation
+        xyz = [pts[0][0]+center[0],pts[0][1]+center[1],center[2]]
+        print("Center Location:", xyz)
+        rect = [[pts[1][0][0]+center[0],pts[1][0][1]+center[0],pts[1][0][2]+center[0],pts[1][0][3]+center[0]],
+        [pts[1][1][0]+center[1],pts[1][1][1]+center[1],pts[1][1][2]+center[1],pts[1][1][3]+center[1]],
+        [center[2],center[2],center[2],center[2]]]
+        print("Rectangles: ", np.matrix(rect))
+        return xyz, rect
+
     def item_outline(self, passed_img):
         threshold = 200
         perm_adj = 50
@@ -392,7 +456,7 @@ class Features(object):
         else:
             found = True
 
-        return found, drawing, rotated_rectangles
+        return found, drawing, rotated_rectangles, boxes
 
     def look_for_object(self, hand_poll, hand_push,object_info, state_info):
         self.estimate_area()
@@ -400,7 +464,8 @@ class Features(object):
         kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
         passed_img = cv2.filter2D(self.img, -1, kernel)
         cv2.imwrite('passed_img.jpg',passed_img)
-        found, drawing, rectangles = self.item_outline(passed_img)
+        found, drawing, rectangles, boxes = self.item_outline(passed_img)
+        xyz = None
         if not found:
             # polls hand camera for image
             hand_poll.put("Get")
@@ -411,6 +476,7 @@ class Features(object):
             image = hand_push.get()
             cv2.imshow("Original Picture: ", image)
             cv2.waitKey(0)
+            self.img = image
             # load new information into class
             self.pass_filter_variables(image, object_info, state_info)
             self.estimate_area()
@@ -419,27 +485,33 @@ class Features(object):
             passed_img = cv2.filter2D(image, -1, kernel)
             # apply brightness increase
             passed_img = self.increase_brightness(passed_img,35)
-            found, drawing, rectangles = self.item_outline(passed_img)
+            found, drawing, rectangles, boxes = self.item_outline(passed_img)
             if not found:
                 print("Cannot Find Image")
-            else:
-                pass
+            elif found:
+                cv2.imshow("drawing", drawing)
+                cv2.waitKey(0)
+                pts = self.scale_points(rectangles, boxes)
+                xyz, rect = self.xyz_reframe(pts)
+        elif found:
             cv2.imshow("drawing", drawing)
             cv2.waitKey(0)
+            pts = self.scale_points(rectangles, boxes)
+            xyz, rect = self.xyz_reframe(pts)
         else:
-            cv2.imshow("drawing", drawing)
-            cv2.waitKey(0)
+            print("Impossible")
+        return xyz, rect
 
 class Path_Exe(object):
     def __init__(self):
         self.nan = Image_Processing()
         self.overhead_vid_path = 0
         self.hand_vid_path = 1
-        arm_lengths = [0.35, 0.20, 0.050]
+        arm_lengths = [0.4, 0.4, 0.050]
         self.path = Path([0,0,0,0.0],arm_lengths)
         # for multiprocessing testing only
         # travel path
-        test = [True, ['remote', [132, 172, 242, 244]], ['person', [333, 44, 641, 436]]]
+        test = [True, ['remote', [798, 0, 1011, 134]], ['remote', [796, 0, 1012, 134]]]
         self.custom_or_search(test)
         # dat = self.nan.obj_search('object')
         # if dat[0]:
@@ -463,10 +535,13 @@ class Path_Exe(object):
 
     def calc_world_pos(self, obj):
         # estimated values found from bounding box while camera was on top of board
-        kx = 1.244
-        ky = 1.288
-        center = [((obj[0]+obj[2])/2)-320,(-(obj[1]+obj[3])/2)+240,0]
-        # print('/n Object Cented at:(in pxls)',center)
+        # kx = 1.244
+        # ky = 1.288
+        kx = 1.4464
+        ky = 1.5403
+        # based on
+        center = [abs((obj[2]-obj[0])/2)+obj[0]-640,-(abs((obj[3]-obj[1])/2)+obj[1])+360,0]
+        # print('\n Object Cented at:(in pxls)',center)
         w_center = [(center[0]*kx)/1000,(center[1]*ky)/1000,0]
         # print('/n Object Cented at:(in meters)',w_center)
         return w_center
@@ -476,16 +551,26 @@ class Path_Exe(object):
         flat_coord = np.sqrt((xy_zero[0]*xy_zero[0]) + (xy_zero[1]*xy_zero[1]))
         l1 = self.path.values['len'][0]
         l2 = self.path.values['len'][1]
-        max_h = (l1 + l2) - 0.15
-        for x in range(0,100):
-            adj = (x * 0.01)
-            w = np.cos(np.radians(60))*(max_h-adj)
-            if ((flat_coord-0.02) <= w) or ((flat_coord+0.02) >= w):
-                xy_zero[2] = np.sin(np.radians(60))*(max_h-adj)
-                break
-            else:
-                pass
-        return xy_zero
+        l3 = self.path.values['len'][2]
+        tot_length = (l1 + l2)
+        max_w = np.sqrt((tot_length**2-l3**2))
+        if flat_coord > max_w:
+            print("Cannot Reach")
+            end_effector = None
+        elif flat_coord < max_w:
+            for x in range(0,90):
+                w = np.cos(np.radians(90-x))*tot_length
+                h = np.sin(np.radians(90-x))*tot_length
+                if (tot_length) >= (np.sqrt(flat_coord**2 + h**2)):
+                    xy_zero[2] = h
+                    end_effector = [xy_zero[0],xy_zero[1],xy_zero[2]]
+                    break
+                else:
+                    end_effector = None
+        else:
+            end_effector = None
+        print("xyz is: ", end_effector)
+        return end_effector
 
     def cameras(self,hand_poll, hand_push, overhead_poll, overhead_push):
         # waits for poll request from image processor
@@ -493,6 +578,10 @@ class Path_Exe(object):
         try:
             vid0 = cv2.VideoCapture(int(self.overhead_vid_path))
             vid1 = cv2.VideoCapture(int(self.hand_vid_path))
+            #
+            vid0.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            vid0.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            #
             vid1.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
             vid1.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         except:
@@ -526,13 +615,13 @@ class Path_Exe(object):
         self.fig = plt.figure()
         self.ax = p3.Axes3D(self.fig)
         # Setting the axes properties
-        self.ax.set_xlim3d([-500, 500])
+        self.ax.set_xlim3d([-800, 800])
         self.ax.set_xlabel('X')
         #
-        self.ax.set_ylim3d([-500, 500])
+        self.ax.set_ylim3d([-800, 800])
         self.ax.set_ylabel('Y')
         #
-        self.ax.set_zlim3d([0.0, 500])
+        self.ax.set_zlim3d([0.0, 800])
         self.ax.set_zlabel('Z')
         #
         self.ax.set_title('3D Test')
@@ -542,18 +631,32 @@ class Path_Exe(object):
         self.line2, = self.ax.plot(set[2][0], set[2][1], 'bo', linestyle='solid')
         self.line3, = self.ax.plot(set[3][0], set[3][1], 'bo', linestyle='solid')
         # self.point1, = self.ax.scatter()
-        self.point1, = self.ax.plot(set[4][0], set[4][1], 'bo', linestyle='solid')
+        # self.point1, = self.ax.plot(set[4][0], set[4][1], 'bo', linestyle='solid')
 
-    def live_sim(self, sim_pull, sim_push):
+    def live_sim(self, sim_static, sim_live):
         # plot = Instance_Plot()
         self.initialize_plot()
+        live_pkg = None
+        static_pkg = None
         while True:
-            if not sim_push.empty():
-                package = sim_push.get()
+            # gets angle values from queue
+            if not sim_live.empty():
+                live_pkg = sim_live.get()
+            else:
+                pass
+            # get points from static library
+            if not sim_static.empty():
+                static_pkg = sim_static.get()
+            else:
+                pass
 
-            elif sim_push.empty():
-                for x in range(0, len(package)):
-                    lines = package[x]
+            if (sim_live.empty() & sim_static.empty() & (live_pkg != None) & (static_pkg != None)):
+                # print("Static Pkg", static_pkg)
+                scale = 1000
+                goals = self.ax.scatter(np.dot(static_pkg['goals'][0],scale),np.dot(static_pkg['goals'][1],scale),np.dot(static_pkg['goals'][2],scale), color = 'r')
+                outline = self.ax.scatter(np.dot(static_pkg['outline'][0],scale),np.dot(static_pkg['outline'][1],scale),np.dot(static_pkg['outline'][2],scale), color = 'g')
+                for x in range(0, len(live_pkg)):
+                    lines = live_pkg[x]
                     scale = 1000
                     self.line0.set_data_3d(np.dot(lines[0][0],scale),np.dot(lines[0][1],scale),np.dot(lines[0][2],scale))
                     #
@@ -563,24 +666,40 @@ class Path_Exe(object):
                     #
                     self.line3.set_data_3d(np.dot(lines[3][0],scale),np.dot(lines[3][1],scale),np.dot(lines[3][2],scale))
                     #
-                    self.point1.set_data_3d([np.dot(lines[4][0],scale),np.dot(lines[4][0],scale)],[np.dot(lines[4][1],scale),np.dot(lines[4][1],scale)],
-                    [np.dot(lines[4][2],scale),np.dot(lines[4][2],scale)])
+                    # self.point1.set_data_3d([np.dot(lines[4][0],scale),np.dot(lines[4][0],scale)],[np.dot(lines[4][1],scale),np.dot(lines[4][1],scale)],
+                    # [np.dot(lines[4][2],scale),np.dot(lines[4][2],scale)])
                     # path of end effector
                     self.fig.canvas.draw()
                     self.fig.canvas.flush_events()
                     # time.sleep(0.0001)
+                goals.remove()
+                outline.remove()
             else:
                 pass
 
-    def path_exe(self, travel, overhead_poll, overhead_push, hand_poll, hand_push, sim_pull, sim_push):
+            if 0xFF == ord('q'):
+                break
+
+    def make_points(self, travel, xyz):
+        pts = []
+        xfyfzf = self.two_three_dim(travel[2][1])
+        pts.append([[xyz[0],xfyfzf[0]],
+                    [xyz[1],xfyfzf[1]],
+                    [xyz[2]-(self.path.values['len'][2]/2), xfyfzf[1]-(self.path.values['len'][2]/2)]])
+        # estimated values found from bounding box while camera was on top of board
+        kx = 1.4464
+        ky = 1.5403
+        pts.append([[((travel[1][1][0]-640)*kx)/1000,((travel[1][1][0]-640)*kx)/1000,((travel[1][1][2]-640)*kx)/1000,((travel[1][1][2]-640)*kx)/1000],
+        [((-travel[1][1][1]+360)*ky)/1000,((-travel[1][1][3]+360)*ky)/1000,((-travel[1][1][1]+360)*ky)/1000,((-travel[1][1][3]+360)*ky)/1000],
+        [0,0,0,0]])
+        return pts
+
+    def path_exe(self, travel, overhead_poll, overhead_push, hand_poll, hand_push, sim_static, sim_live):
         # use inverse kinematics to determine end effector postion
         xyz = self.two_three_dim(travel[1][1])
         # define animation and stepper motor path
         # bool says whether object is within reach
         path, step_path, bool = self.path.find_path_to(xyz)
-        # shift point down for goal
-        pt = [xyz[0],xyz[1]]
-        pt.append(xyz[2]-(self.path.values['len'][2]/2))
         # stand-in for claw angle which will be found later
         angle5_standin = 90
         gripper_width = 0.1
@@ -590,22 +709,25 @@ class Path_Exe(object):
         # define object_info library
         object_info = {'name':travel[1][0],
         'over_A':((travel[1][1][0]-travel[1][1][2])*(travel[1][1][1]-travel[1][1][3])),
-        'over_res':[480,640]}
+        'over_res':[720,1280]}
         # define state info
         # stand in for ultra sonic sensor
         ultra_h_standin = xyz[2]-self.path.values['len'][2]
+        pts = self.make_points(travel,xyz)
+        state_info = {'xyz':[xyz[0],xyz[1],xyz[2]-(self.path.values['len'][2]/2)],
+        'angle4':end_angles[3], 'angle5':end_angles[4],'ultra_h':ultra_h_standin,'m_hx':4,'m_hy':4}
+        # pts = self.make_points(travel,xyz)
 
-        state_info = {'xyz':pt,'angle4':end_angles[3], 'angle5':end_angles[4],
-        'ultra_h':ultra_h_standin,'m_hx':4,'m_hy':4}
+        static_pkg = {'goals':pts[0],'outline':pts[1]}
         if bool:
             plotter = Plot(self.path.values['len'])
             suite = []
             for x in range(0,len(path[0])):
                 post = plotter.position([path[0][x], path[1][x], path[2][x], path[3][x], angle5_standin],gripper_width)
-                post.append(pt)
+                # post.append(pt)
                 suite.append(post)
-            sim_push.put(suite)
-
+            sim_live.put(suite)
+            sim_static.put(static_pkg)
             # polls hand camera for image
             hand_poll.put("Get")
             # waits
@@ -618,7 +740,19 @@ class Path_Exe(object):
             cv2.waitKey(0)
             feat = Features()
             feat.pass_filter_variables(image, object_info, state_info)
-            feat.look_for_object(hand_poll, hand_push, object_info, state_info)
+            new_center, rect = feat.look_for_object(hand_poll, hand_push, object_info, state_info)
+            if new_center != None:
+                pts[0][0].append(new_center[0])
+                pts[0][1].append(new_center[1])
+                pts[0][2].append(new_center[2])
+                pts[1][0] = rect[0]
+                pts[1][1] = rect[1]
+                pts[1][2] = rect[2]
+                static_pkg = {'goals':pts[0],'outline':pts[1]}
+                sim_static.put(static_pkg)
+            else:
+                pass
+
         else:
             pass
 
@@ -628,19 +762,19 @@ class Path_Exe(object):
         hand_push = Queue()
         overhead_poll = Queue()
         overhead_push = Queue()
-        sim_push = Queue()
-        sim_pull = Queue()
+        sim_live = Queue()
+        sim_static = Queue()
         # process intiialization for running multiple functions
         # at the same time
         path_exe_p = Process(target=self.path_exe, args=(travel, overhead_poll, overhead_push,
-        hand_poll, hand_push, sim_pull, sim_push))
+        hand_poll, hand_push, sim_static, sim_live))
         path_exe_p.start()
         #
         cameras_p = Process(target=self.cameras, args=(hand_poll, hand_push,
         overhead_poll, overhead_push))
         cameras_p.start()
         #
-        live_sim_p = Process(target=self.live_sim, args=(sim_pull, sim_push))
+        live_sim_p = Process(target=self.live_sim, args=(sim_static, sim_live))
         live_sim_p.start()
         processes = [path_exe_p,cameras_p,live_sim_p]
         # join processes together
