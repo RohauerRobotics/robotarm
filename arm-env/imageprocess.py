@@ -142,6 +142,8 @@ class Image_Processing(object):
         # begin video capture
         try:
             vid = cv2.VideoCapture(int(video_path))
+            vid.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            vid.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         except:
             vid = cv2.VideoCapture(video_path)
 
