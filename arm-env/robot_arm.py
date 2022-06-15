@@ -20,9 +20,10 @@ class Path(object):
       "micro_steps":200, "w_max": np.pi, "accel":np.pi/8
       }
 
-  def find_path_to(self, goal):
+  def find_path_to(self, goal, grip_anglef):
       if goal != None:
           final, bool = self.inverse_kinematics(goal)
+          final.append(grip_anglef)
       elif goal == None:
           bool = False
       else:
@@ -81,7 +82,7 @@ class Path(object):
           else:
               pass
           # angles for postion finder
-          print("Phi 1, 2, 4: ",np.degrees(phi1),",",np.degrees(phi2),",",np.degrees(phi4))
+          # print("Phi 1, 2, 4: ",np.degrees(phi1),",",np.degrees(phi2),",",np.degrees(phi4))
           # print("angle relative to x axis",np.degrees(phi1+phi4))
           angle1 = (np.pi/2)- (phi4 + phi1)
           angle2 = np.pi - phi2
@@ -98,87 +99,96 @@ class Path(object):
                   angle4 = np.arctan(y/x) + np.pi
               else:
                   angle4 = np.arctan(y/x)
-          print("Angles:",np.degrees(angle1),np.degrees(angle2),np.degrees(angle3),np.degrees(angle4))
-          path= [np.degrees(angle1),np.degrees(angle2),np.degrees(angle3),np.degrees(angle4)]
+          # print("Angles:",np.degrees(angle1),np.degrees(angle2),np.degrees(angle3),np.degrees(angle4))
+          path = [np.degrees(angle1),np.degrees(angle2),np.degrees(angle3),np.degrees(angle4)]
       else:
           pass
       return path, bool
 
   def animation_path(self, inital, final):
-      path = [[],[],[],[]]
-      theta = [0,0,0,0]
-      self.step_path = [[],[],[],[]]
-      for w in range(0, 4):
-          couple = [final[w],inital[w]]
-          abs_couple = [abs(final[w]),abs(inital[w])]
-          print("Initial Angles: ", couple)
-          print("Abs Couple", abs_couple)
-          if final[w] == 0:
-              abs_couple[0] = 0
-          elif inital[w] == 0:
-              abs_couple[1] = 0
-          else:
-              pass
-          # print(abs_couple)
-          # adjust values if outside range
-          if(inital[w])>360:
-              inital[w] = inital[w]-360
-          elif(inital[w])<0:
-              inital[w] = inital[w] + 360
-          elif(final[w])>360:
-              final[w] = final[w]-360
-          elif(final[w])<0:
-              final[w] = final[w] + 360
-          else:
-              pass
-          # determine shortest number of steps between angles
-          if (abs(couple[0]-couple[1]) > 180):
-              negative_max = abs(max(couple) - 360)
-              angle = negative_max + min(abs_couple)
-              theta[w] = round(np.radians(angle),3)
-              steps = int(angle)
-              if inital[w] == max(couple):
-                  # print("Step A")
-                  for x in range(0, steps+1):
-                      path[w].append(inital[w]+(x*(angle/steps)))
-                  self.step_path[w].append(True)
-              elif final[w] == max(couple):
-                  # print("Step B")
-                  for x in range(0, steps+1):
-                      path[w].append(inital[w]-(x*(angle/steps)))
-                  # print("correct path", w)
-                  self.step_path[w].append(False)
+      path = [[],[],[],[],[]]
+      theta = [0,0,0,0,0]
+      self.step_path = [[],[],[],[],[]]
+      for w in range(0, 5):
+          if final[w] != inital[w]:
+              couple = [final[w],inital[w]]
+              abs_couple = [abs(final[w]),abs(inital[w])]
+              # print("Initial Angles: ", couple)
+              # print("Abs Couple", abs_couple)
+              if final[w] == 0:
+                  abs_couple[0] = 0
+              elif inital[w] == 0:
+                  abs_couple[1] = 0
               else:
-                  print("error 1", w)
+                  pass
+              # print(abs_couple)
+              # adjust values if outside range
+              if(inital[w])>360:
+                  inital[w] = inital[w]-360
+              elif(inital[w])<0:
+                  inital[w] = inital[w] + 360
+              elif(final[w])>360:
+                  final[w] = final[w]-360
+              elif(final[w])<0:
+                  final[w] = final[w] + 360
+              else:
+                  pass
+              # determine shortest number of steps between angles
+              if (abs(couple[0]-couple[1]) > 180):
+                  negative_max = abs(max(couple) - 360)
+                  angle = negative_max + min(abs_couple)
+                  theta[w] = round(np.radians(angle),3)
+                  steps = int(angle)
+                  if steps == 0:
+                      for x in range(0, steps+1):
+                          path[w].append(final[w])
+                  else:
+                      if inital[w] == max(couple):
+                          # print("Step A")
+                          for x in range(0, steps+1):
+                              path[w].append(inital[w]+(x*(angle/steps)))
+                          self.step_path[w].append(True)
+                      elif final[w] == max(couple):
+                          # print("Step B")
+                          for x in range(0, steps+1):
+                              path[w].append(inital[w]-(x*(angle/steps)))
+                          # print("correct path", w)
+                          self.step_path[w].append(False)
+                      else:
+                          print("error 1", w)
 
-          elif (abs(couple[0]-couple[1]) <= 180):
-              angle = max(abs_couple) - min(abs_couple)
-              theta[w] = round(np.radians(angle),3)
-              steps = int(angle)
-              # inital
-              if inital[w] == max(couple):
-                  # print("Step C")
-                  for x in range(0, steps+1):
-                      path[w].append(inital[w]-(x*(angle/steps)))
-                  # print("correct path", w)
-                  self.step_path[w].append(False)
-              # final
-              elif final[w] == max(couple):
-                  # print("Step D")
-                  # print("Number of Steps:", steps)
-                  # print("Path :", w)
-                  # print("inital", inital[w])
-                  # print("path", path[w])
-                  for x in range(0, steps+1):
-                      path[w].append(inital[w]+(x*(angle/steps)))
-                  self.step_path[w].append(True)
+              elif (abs(couple[0]-couple[1]) <= 180):
+                  angle = max(abs_couple) - min(abs_couple)
+                  theta[w] = round(np.radians(angle),3)
+                  steps = int(angle)
+                  # inital
+                  if steps == 0:
+                      for x in range(0, steps+1):
+                          path[w].append(final[w])
+                  else:
+                      if inital[w] == max(couple):
+                          # print("Step C")
+                          for x in range(0, steps+1):
+                              path[w].append(inital[w]-(x*(angle/steps)))
+                          # print("correct path", w)
+                          self.step_path[w].append(False)
+                      # final
+                      elif final[w] == max(couple):
+                          # print("Step D")
+                          # print("Number of Steps:", steps)
+                          # print("Path :", w)
+                          # print("inital", inital[w])
+                          # print("path", path[w])
+                          for x in range(0, steps+1):
+                              path[w].append(inital[w]+(x*(angle/steps)))
+                          self.step_path[w].append(True)
+                      else:
+                          print("error 2")
               else:
-                  print("error 2")
-          else:
-              # print("Passed List")
-              pass
-          if (final[w]==inital[w]):
-              path[w].append(0)
+                  # print("Passed List")
+                  pass
+          elif (final[w]==inital[w]):
+              path[w].append(final[w])
               # print("appended 0")
               theta[w] = 0
           else:
@@ -380,22 +390,39 @@ class Features(object):
         pts = []
         kx = 1.414
         ky = 1.53
-        print("self.xyz", self.xyz)
+        # print("self.xyz", self.xyz)
         h = self.xyz[2]-self.ultrasonic_height
-        print("Rectangles[0]",rectangles[0])
-        print("Rectangles[0][0]",rectangles[0][0])
-        print("Rectangles[0][0][0]",rectangles[0][0][0])
+        # print("Rectangles[0]",rectangles[0])
+        # print("Rectangles[0][0]",rectangles[0][0])
+        # print("Rectangles[0][0][0]",rectangles[0][0][0])
         center = [((rectangles[0][0][0]-640)*kx)/1000, ((-rectangles[0][0][1]+360)*ky)/1000, h]
-        print("/nRectangle Center: ", center)
+        # print("/nRectangle Center: ", center)
         pts.append(center)
         # estimated values found from bounding box while camera was on top of board
-        print("Boxes[0]",boxes[0])
-        print("Boxes[0][0]",boxes[0][0])
-        print("Boxes[0][0][0]",boxes[0][0][0])
+        # print("Boxes[0]",boxes[0])
+        # print("Boxes[0][0]",boxes[0][0])
+        # print("Boxes[0][0][0]",boxes[0][0][0])
         pts.append([[((boxes[0][0][0]-640)*kx)/1000,((boxes[0][1][0]-640)*kx)/1000,((boxes[0][2][0]-640)*kx)/1000,((boxes[0][3][0]-640)*kx)/1000],
         [((-boxes[0][0][1]+360)*ky)/1000,((-boxes[0][1][1]+360)*ky)/1000,((-boxes[0][2][1]+360)*ky)/1000,((-boxes[0][3][1]+360)*ky)/1000],
         [h,h,h,h]])
-        return pts
+        # find the angle of rotation
+        width = rectangles[0][1][0]
+        height = rectangles[0][1][1]
+        angle = rectangles[0][2]
+        # finds amount of rotation to long side of angle
+        if width < height:
+            angle = 90 - angle
+        else:
+            angle = - angle
+        # self explanatory
+        # if angle > 90:
+        #     move = angle - 180
+        # elif angle <= 90:
+        #     move = angle
+        # else:
+        #     move = 0
+        move = angle
+        return pts, move
 
     def xyz_reframe(self, pts):
         # define homogenous transfer matricies
@@ -416,11 +443,11 @@ class Features(object):
         # xyz = [h_ac[0][3],h_ac[1][3],h_ac[2][3]]
         # try adding displacment vectors to see difference from concatonation
         xyz = [pts[0][0]+center[0],pts[0][1]+center[1],center[2]]
-        print("Center Location:", xyz)
+        # print("Center Location:", xyz)
         rect = [[pts[1][0][0]+center[0],pts[1][0][1]+center[0],pts[1][0][2]+center[0],pts[1][0][3]+center[0]],
         [pts[1][1][0]+center[1],pts[1][1][1]+center[1],pts[1][1][2]+center[1],pts[1][1][3]+center[1]],
         [center[2],center[2],center[2],center[2]]]
-        print("Rectangles: ", np.matrix(rect))
+        # print("Rectangles: ", np.matrix(rect))
         return xyz, rect
 
     def item_outline(self, passed_img):
@@ -491,16 +518,16 @@ class Features(object):
             elif found:
                 cv2.imshow("drawing", drawing)
                 cv2.waitKey(0)
-                pts = self.scale_points(rectangles, boxes)
+                pts, move = self.scale_points(rectangles, boxes)
                 xyz, rect = self.xyz_reframe(pts)
         elif found:
             cv2.imshow("drawing", drawing)
             cv2.waitKey(0)
-            pts = self.scale_points(rectangles, boxes)
+            pts, move = self.scale_points(rectangles, boxes)
             xyz, rect = self.xyz_reframe(pts)
         else:
             print("Impossible")
-        return xyz, rect
+        return xyz, rect, move
 
 class Path_Exe(object):
     def __init__(self):
@@ -508,7 +535,7 @@ class Path_Exe(object):
         self.overhead_vid_path = 0
         self.hand_vid_path = 1
         arm_lengths = [0.4, 0.4, 0.050]
-        self.path = Path([0,0,0,0.0],arm_lengths)
+        self.path = Path([0,0,0,0,90],arm_lengths)
         # for multiprocessing testing only
         # travel path
         test = [True, ['remote', [798, 0, 1011, 134]], ['remote', [796, 0, 1012, 134]]]
@@ -699,12 +726,13 @@ class Path_Exe(object):
         xyz = self.two_three_dim(travel[1][1])
         # define animation and stepper motor path
         # bool says whether object is within reach
-        path, step_path, bool = self.path.find_path_to(xyz)
+        angle5 = 90
+        path, step_path, bool = self.path.find_path_to(xyz,angle5)
         # stand-in for claw angle which will be found later
-        angle5_standin = 90
+        angle5 = 90
         gripper_width = 0.1
         # needed for image orientation
-        end_angles = [path[0][-1],path[1][-1],path[2][-1],path[3][-1], angle5_standin]
+        end_angles = [path[0][-1],path[1][-1],path[2][-1],path[3][-1], path[4][-1]]
         print("end_angles: ", end_angles)
         # define object_info library
         object_info = {'name':travel[1][0],
@@ -723,7 +751,7 @@ class Path_Exe(object):
             plotter = Plot(self.path.values['len'])
             suite = []
             for x in range(0,len(path[0])):
-                post = plotter.position([path[0][x], path[1][x], path[2][x], path[3][x], angle5_standin],gripper_width)
+                post = plotter.position([path[0][x], path[1][x], path[2][x], path[3][x], path[4][x]],gripper_width)
                 # post.append(pt)
                 suite.append(post)
             sim_live.put(suite)
@@ -740,7 +768,7 @@ class Path_Exe(object):
             cv2.waitKey(0)
             feat = Features()
             feat.pass_filter_variables(image, object_info, state_info)
-            new_center, rect = feat.look_for_object(hand_poll, hand_push, object_info, state_info)
+            new_center, rect, move = feat.look_for_object(hand_poll, hand_push, object_info, state_info)
             if new_center != None:
                 pts[0][0].append(new_center[0])
                 pts[0][1].append(new_center[1])
@@ -749,7 +777,19 @@ class Path_Exe(object):
                 pts[1][1] = rect[1]
                 pts[1][2] = rect[2]
                 static_pkg = {'goals':pts[0],'outline':pts[1]}
-                sim_static.put(static_pkg)
+                self.path.values['iA'] = end_angles
+                path1, step_path1, bool1 = self.path.find_path_to(new_center,((move/2)+angle5))
+                if bool1:
+                    suite1 = []
+                    for x in range(0,len(path1[0])):
+                        post = plotter.position([path1[0][x], path1[1][x], path1[2][x], path1[3][x], path1[4][x]],gripper_width)
+                        # post.append(pt)
+                        suite.append(post)
+
+                    sim_live.put(suite)
+                    sim_static.put(static_pkg)
+                else:
+                    print("F")
             else:
                 pass
 
