@@ -20,10 +20,13 @@ class Path(object):
       "micro_steps":200, "w_max": np.pi, "accel":np.pi/8
       }
 
-  def find_path_to(self, goal, grip_anglef):
+  def find_path_to(self, goal, grip_anglef, grasp_time):
       if goal != None:
           final, bool = self.inverse_kinematics(goal)
-          final.append(grip_anglef)
+          if grasp_time:
+              final.append(grip_anglef-final[3])
+          elif not grasp_time:
+              final.append(grip_anglef)
       elif goal == None:
           bool = False
       else:
@@ -195,7 +198,7 @@ class Path(object):
               pass
       list_len = [len(i) for i in path]
       # print("Path Length: ",path)
-      self.dir = [self.step_path[i][0] for i in range(0,4)]
+      # self.dir = [self.step_path[i][0] for i in range(0,4)]
       self.theta = theta
       for w in range(0, len(path)):
           path[w].extend([path[w][-1]]*(max(list_len)-len(path[w])))
@@ -386,6 +389,89 @@ class Features(object):
         img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
         return img
 
+    def search_val(self,elem):
+        return elem[1]
+
+    def find_move_angle(self, rectangles, boxes):
+        kx = 1.414
+        ky = 1.53
+        center = [rectangles[0][0][0], rectangles[0][0][1]]
+        points = [[boxes[0][0][0],boxes[0][0][1]],
+        [boxes[0][1][0],boxes[0][1][1]],
+        [boxes[0][2][0],boxes[0][2][1]],
+        [boxes[0][3][0],boxes[0][3][1]]]
+        # define shift values for box
+        shiftx = 640 - center[0]
+        shifty = 360 - center[1]
+        # shift all points so center of rectangle is in center
+        # of screen
+        for x in range(0,4):
+            points[x][0] = points[x][0] + shiftx
+            points[x][1] = points[x][1] + shifty
+        # verify that center is at center
+        # print("center shifted x: ", (center[0] + shiftx) - 640)
+        # print("center shifted y: ", -(center[1] + shifty) + 360)
+        # convert points to cartesian plane
+        for x in range(0,4):
+            points[x][0] = points[x][0] - 640
+            points[x][1] = -points[x][1] + 360
+        # print("Cartesian Points: ", points)
+        # use first pair of cartesian coordinates to
+        # define indexes for 3 different magnitudes
+        mag_lst = []
+        for i in range(1,4):
+            dx = points[i][0] - points[0][0]
+            dy = points[i][1] - points[0][1]
+            mag_lst.append([i, np.sqrt(dy**2+dx**2)])
+        # order the magnitude list from largest magnitude to
+        # smallest value
+        mag_lst.sort(reverse=True,key = self.search_val)
+        # find magnitude of gripper grip_width
+        wdx = (points[mag_lst[2][0]][0]-points[0][0])*kx
+        wdy = (points[mag_lst[2][0]][1]-points[0][1])*ky
+        grip_width = np.sqrt(wdx**2+wdy**2)/1000
+        print("Grip Width: ", grip_width)
+        # print("Ordered Magnitude List: ", mag_lst)
+        # midpoint of long side 1
+        mid_x1 = points[0][0] + ((points[mag_lst[1][0]][0]-points[0][0])/2)
+        mid_y1 = points[0][1] + ((points[mag_lst[1][0]][1]-points[0][1])/2)
+        # print("Midpoint Corner(x,y),(x1,y1): ",[points[0][0],points[0][1]],[points[mag_lst[1][0]][0],points[mag_lst[1][0]][1]])
+        # print("Midpoint (x,y)", [mid_x1,mid_y1])
+        # midpoint of long side 2
+        mid_x2 = points[mag_lst[2][0]][0] + ((points[mag_lst[0][0]][0]-points[mag_lst[2][0]][0])/2)
+        mid_y2 = points[mag_lst[2][0]][1] + ((points[mag_lst[0][0]][1]-points[mag_lst[2][0]][1])/2)
+        # makes unit vectos of the midpoints
+        unit_scale1 = np.sqrt(mid_x1**2 + mid_y1**2)
+        unit_scale2 = np.sqrt(mid_x2**2 + mid_y2**2)
+        m1 = [mid_x1/unit_scale1,mid_y1/unit_scale1]
+        m2 = [mid_x2/unit_scale2,mid_y2/unit_scale2]
+        mdps = [m1,m2]
+        # print("These are the mid points: ", mdps)
+        # find 2 angles based on the unit vector form of
+        # the x and y values of each midpoint
+        if mdps[0][1] > 0:
+            theta1 = np.arccos(mdps[0][0])
+            theta2 = np.arcsin(mdps[1][1])
+            print("A")
+        elif mdps[1][1] > 0:
+            theta1 = np.arccos(mdps[1][0])
+            theta2 = np.arcsin(mdps[0][1])
+            print("B")
+        else:
+            print("something else happened")
+        # select smaller angle to return
+        val = 0
+        if abs(theta1) < abs(theta2):
+            val = np.degrees(theta1)
+        elif abs(theta1) > abs(theta2):
+            val = np.degrees(theta2)
+        else:
+            print("theta1 must equal theta 2")
+            val = np.degrees(theta2)
+
+        print("Angle5 move value: ", val)
+        return val, grip_width
+
     def scale_points(self, rectangles, boxes):
         pts = []
         kx = 1.414
@@ -410,19 +496,8 @@ class Features(object):
         height = rectangles[0][1][1]
         angle = rectangles[0][2]
         # finds amount of rotation to long side of angle
-        if width < height:
-            angle = 90 - angle
-        else:
-            angle = - angle
-        # self explanatory
-        # if angle > 90:
-        #     move = angle - 180
-        # elif angle <= 90:
-        #     move = angle
-        # else:
-        #     move = 0
-        move = angle
-        return pts, move
+        move, grip_width = self.find_move_angle(rectangles, boxes)
+        return pts, move, grip_width
 
     def xyz_reframe(self, pts):
         # define homogenous transfer matricies
@@ -492,7 +567,9 @@ class Features(object):
         passed_img = cv2.filter2D(self.img, -1, kernel)
         cv2.imwrite('passed_img.jpg',passed_img)
         found, drawing, rectangles, boxes = self.item_outline(passed_img)
+        # define "empty" varibles to avoid issues
         xyz = None
+        grip_width = 0.1
         if not found:
             # polls hand camera for image
             hand_poll.put("Get")
@@ -518,16 +595,16 @@ class Features(object):
             elif found:
                 cv2.imshow("drawing", drawing)
                 cv2.waitKey(0)
-                pts, move = self.scale_points(rectangles, boxes)
+                pts, move, grip_width = self.scale_points(rectangles, boxes)
                 xyz, rect = self.xyz_reframe(pts)
         elif found:
             cv2.imshow("drawing", drawing)
             cv2.waitKey(0)
-            pts, move = self.scale_points(rectangles, boxes)
+            pts, move, grip_width = self.scale_points(rectangles, boxes)
             xyz, rect = self.xyz_reframe(pts)
         else:
             print("Impossible")
-        return xyz, rect, move
+        return xyz, rect, move, grip_width
 
 class Path_Exe(object):
     def __init__(self):
@@ -721,15 +798,36 @@ class Path_Exe(object):
         [0,0,0,0]])
         return pts
 
+    def amend_z(self, center):
+        # function to make sure the end effector doesn't
+        # push itself into an object or the ground
+        if center[2] < (self.path.values['len'][2]):
+            center[2] = (self.path.values['len'][2])
+        else:
+            pass
+
+        return center
+
+    def arrange_static(self,pts, rect, new_center):
+        print("New Center: ", new_center)
+        verify = self.amend_z(new_center)
+        print("Verified Center: ", verify)
+        pts[0][0].append(new_center[0])
+        pts[0][1].append(new_center[1])
+        pts[0][2].append(verify[2])
+        pts[1][0] = rect[0]
+        pts[1][1] = rect[1]
+        pts[1][2] = rect[2]
+        return pts, verify
+
     def path_exe(self, travel, overhead_poll, overhead_push, hand_poll, hand_push, sim_static, sim_live):
         # use inverse kinematics to determine end effector postion
         xyz = self.two_three_dim(travel[1][1])
         # define animation and stepper motor path
         # bool says whether object is within reach
         angle5 = 90
-        path, step_path, bool = self.path.find_path_to(xyz,angle5)
+        path, step_path, bool = self.path.find_path_to(xyz,angle5,False)
         # stand-in for claw angle which will be found later
-        angle5 = 90
         gripper_width = 0.1
         # needed for image orientation
         end_angles = [path[0][-1],path[1][-1],path[2][-1],path[3][-1], path[4][-1]]
@@ -768,21 +866,16 @@ class Path_Exe(object):
             cv2.waitKey(0)
             feat = Features()
             feat.pass_filter_variables(image, object_info, state_info)
-            new_center, rect, move = feat.look_for_object(hand_poll, hand_push, object_info, state_info)
+            new_center, rect, move, grip_width = feat.look_for_object(hand_poll, hand_push, object_info, state_info)
             if new_center != None:
-                pts[0][0].append(new_center[0])
-                pts[0][1].append(new_center[1])
-                pts[0][2].append(new_center[2])
-                pts[1][0] = rect[0]
-                pts[1][1] = rect[1]
-                pts[1][2] = rect[2]
+                pts, verify = self.arrange_static(pts,rect, new_center)
                 static_pkg = {'goals':pts[0],'outline':pts[1]}
                 self.path.values['iA'] = end_angles
-                path1, step_path1, bool1 = self.path.find_path_to(new_center,((move/2)+angle5))
+                path1, step_path1, bool1 = self.path.find_path_to(verify, (abs(move) + angle5),False)
                 if bool1:
                     suite1 = []
                     for x in range(0,len(path1[0])):
-                        post = plotter.position([path1[0][x], path1[1][x], path1[2][x], path1[3][x], path1[4][x]],gripper_width)
+                        post = plotter.position([path1[0][x], path1[1][x], path1[2][x], path1[3][x], path1[4][x]], grip_width)
                         # post.append(pt)
                         suite.append(post)
 
