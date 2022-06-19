@@ -373,8 +373,10 @@ class Features(object):
         area_est = ((self.ultrasonic_height**2)*self.mx*self.my*resized_area)
         # try estimating perimeter instead of area
         self.perm_est = 2*np.pi*np.sqrt((area_est/np.pi))
-        print("Original Area: ",self.overhead_area)
-        print("Object in new image perimeter estimation: ", self.perm_est)
+        # add fixed perimeter estimation for testing
+        self.perm_est = 1162.5762034949778
+        # print("Original Area: ",self.overhead_area)
+        # print("Object in new image perimeter estimation: ", self.perm_est)
         return self.perm_est
 
     def increase_brightness(self, img, value):
@@ -786,10 +788,10 @@ class Path_Exe(object):
 
     def make_points(self, travel, xyz):
         pts = []
-        xfyfzf = self.two_three_dim(travel[2][1])
-        pts.append([[xyz[0],xfyfzf[0]],
-                    [xyz[1],xfyfzf[1]],
-                    [xyz[2]-(self.path.values['len'][2]/2), xfyfzf[1]-(self.path.values['len'][2]/2)]])
+        # xfyfzf = self.two_three_dim(travel[2][1])
+        pts.append([[xyz[0]],
+                    [xyz[1]],
+                    [xyz[2]]])
         # estimated values found from bounding box while camera was on top of board
         kx = 1.4464
         ky = 1.5403
@@ -798,27 +800,76 @@ class Path_Exe(object):
         [0,0,0,0]])
         return pts
 
-    def amend_z(self, center):
-        # function to make sure the end effector doesn't
-        # push itself into an object or the ground
-        if center[2] < (self.path.values['len'][2]):
-            center[2] = (self.path.values['len'][2])
+    def arrange_static(self,pts, rect, new_center, ultra_h_standin, xyz, i, num_updates):
+        distance = ultra_h_standin
+        print("divisor: ",num_updates-i)
+        z_val = (distance - ((distance)/(num_updates-i)))
+        # make sure it doesn't go through ground
+        if z_val < self.path.values['len'][2]:
+            z_val = self.path.values['len'][2]
         else:
             pass
-
-        return center
-
-    def arrange_static(self,pts, rect, new_center):
-        print("New Center: ", new_center)
-        verify = self.amend_z(new_center)
-        print("Verified Center: ", verify)
         pts[0][0].append(new_center[0])
         pts[0][1].append(new_center[1])
-        pts[0][2].append(verify[2])
+        pts[0][2].append(z_val)
         pts[1][0] = rect[0]
         pts[1][1] = rect[1]
         pts[1][2] = rect[2]
-        return pts, verify
+        return pts, [new_center[0],new_center[1],z_val]
+
+    def iterative_approach(self,num_updates,ultra_h_standin,path,xyz,state_info,pts,suite,applied_width,sim_live,sim_static,hand_poll,hand_push):
+        # plotter = Plot(self.path.values['len'])
+        # suite = []
+        feat = Features()
+        end_angles = [path[0][-1], path[1][-1], path[2][-1], path[3][-1], path[4][-1]]
+        ultra_h_standin = (xyz[2]-0.01)
+        last_move = 0
+        for i in range(0, num_updates):
+            # polls hand camera for image
+            hand_poll.put("Get")
+            # waits
+            while hand_push.empty():
+                pass
+            # displays image
+            image = hand_push.get()
+            cv2.imshow("Hand Cam", image)
+            cv2.waitKey(0)
+            angle5 = end_angles[4]
+            # use feature class to find center of object, angle, ect
+            feat.pass_filter_variables(image, self.object_info, state_info)
+            new_center, rect, move, grip_width = feat.look_for_object(hand_poll, hand_push, self.object_info, state_info)
+            #
+            actual_move = move - last_move
+            last_move = move
+            if (new_center != None):
+                pts, verify = self.arrange_static(pts, rect, new_center, ultra_h_standin, xyz, i, num_updates)
+                static_pkg = {'goals':pts[0],'outline':pts[1]}
+                self.path.values['iA'] = end_angles
+                path1, step_path1, bool1 = self.path.find_path_to(verify,abs(actual_move)+angle5,False)
+                # will grasp item if count is final
+                if i == (num_updates-1):
+                    applied_width = grip_width
+                else:
+                    pass
+
+                if bool1:
+                    for x in range(0, len(path1[0])):
+                        post = self.plotter.position([path1[0][x], path1[1][x], path1[2][x], path1[3][x], path1[4][x]], applied_width)
+                        # post.append(pt)
+                        suite.append(post)
+                    # post data to the simulation
+                    sim_live.put(suite)
+                    sim_static.put(static_pkg)
+                    # determine xyz of the end effector
+                    end_position = self.plotter.position([path1[0][-1], path1[1][-1], path1[2][-1], path1[3][-1], path1[4][-1]], grip_width)
+                    xyz = [end_position[2][0][1], end_position[2][1][1], end_position[2][2][0]]
+                    # determine last angles of the arm
+                    end_angles = [path1[0][-1], path1[1][-1], path1[2][-1], path1[3][-1], path1[4][-1]]
+                    ultra_h_standin = (xyz[2]-0.01)
+                    state_info = {'xyz':[xyz[0],xyz[1],xyz[2]],
+                    'angle4':end_angles[3], 'angle5':end_angles[4],'ultra_h':ultra_h_standin,'m_hx':4,'m_hy':4}
+                else:
+                    print("F")
 
     def path_exe(self, travel, overhead_poll, overhead_push, hand_poll, hand_push, sim_static, sim_live):
         # use inverse kinematics to determine end effector postion
@@ -833,58 +884,28 @@ class Path_Exe(object):
         end_angles = [path[0][-1],path[1][-1],path[2][-1],path[3][-1], path[4][-1]]
         print("end_angles: ", end_angles)
         # define object_info library
-        object_info = {'name':travel[1][0],
+        self.object_info = {'name':travel[1][0],
         'over_A':((travel[1][1][0]-travel[1][1][2])*(travel[1][1][1]-travel[1][1][3])),
         'over_res':[720,1280]}
         # define state info
         # stand in for ultra sonic sensor
-        ultra_h_standin = xyz[2]-self.path.values['len'][2]
+        ultra_h_standin = xyz[2] - 0.01
         pts = self.make_points(travel,xyz)
-        state_info = {'xyz':[xyz[0],xyz[1],xyz[2]-(self.path.values['len'][2]/2)],
+        state_info = {'xyz':[xyz[0],xyz[1],xyz[2]],
         'angle4':end_angles[3], 'angle5':end_angles[4],'ultra_h':ultra_h_standin,'m_hx':4,'m_hy':4}
         # pts = self.make_points(travel,xyz)
-
         static_pkg = {'goals':pts[0],'outline':pts[1]}
         if bool:
-            plotter = Plot(self.path.values['len'])
+            self.plotter = Plot(self.path.values['len'])
             suite = []
             for x in range(0,len(path[0])):
-                post = plotter.position([path[0][x], path[1][x], path[2][x], path[3][x], path[4][x]],gripper_width)
-                # post.append(pt)
+                post = self.plotter.position([path[0][x], path[1][x], path[2][x], path[3][x], path[4][x]],gripper_width)
                 suite.append(post)
             sim_live.put(suite)
             sim_static.put(static_pkg)
             # polls hand camera for image
-            hand_poll.put("Get")
-            # waits
-            while hand_push.empty():
-                pass
-            # displays image
-            image = hand_push.get()
-            print("Image Size:", image.shape)
-            cv2.imshow("Hand Cam", image)
-            cv2.waitKey(0)
-            feat = Features()
-            feat.pass_filter_variables(image, object_info, state_info)
-            new_center, rect, move, grip_width = feat.look_for_object(hand_poll, hand_push, object_info, state_info)
-            if new_center != None:
-                pts, verify = self.arrange_static(pts,rect, new_center)
-                static_pkg = {'goals':pts[0],'outline':pts[1]}
-                self.path.values['iA'] = end_angles
-                path1, step_path1, bool1 = self.path.find_path_to(verify, (abs(move) + angle5),False)
-                if bool1:
-                    suite1 = []
-                    for x in range(0,len(path1[0])):
-                        post = plotter.position([path1[0][x], path1[1][x], path1[2][x], path1[3][x], path1[4][x]], grip_width)
-                        # post.append(pt)
-                        suite.append(post)
-
-                    sim_live.put(suite)
-                    sim_static.put(static_pkg)
-                else:
-                    print("F")
-            else:
-                pass
+            num_updates = 3
+            self.iterative_approach(num_updates,ultra_h_standin,path,xyz,state_info,pts,suite,gripper_width,sim_live,sim_static,hand_poll,hand_push)
 
         else:
             pass
