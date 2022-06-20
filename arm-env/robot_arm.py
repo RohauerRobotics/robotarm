@@ -100,9 +100,12 @@ class Path(object):
           elif x != 0:
               if ((x < 0) ^ (y<0)):
                   angle4 = np.arctan(y/x) + np.pi
+              elif ((x<0)&(y<0)):
+                  angle4 = np.arctan(y/x) + np.pi
               else:
                   angle4 = np.arctan(y/x)
           # print("Angles:",np.degrees(angle1),np.degrees(angle2),np.degrees(angle3),np.degrees(angle4))
+          print("Final Angle 4:", np.degrees(angle4))
           path = [np.degrees(angle1),np.degrees(angle2),np.degrees(angle3),np.degrees(angle4)]
       else:
           pass
@@ -617,7 +620,7 @@ class Path_Exe(object):
         self.path = Path([0,0,0,0,90],arm_lengths)
         # for multiprocessing testing only
         # travel path
-        test = [True, ['remote', [798, 0, 1011, 134]], ['remote', [796, 0, 1012, 134]]]
+        test = [True, ['remote', [816, 0, 1035, 138]], ['person', [7, 203, 298, 717]]]
         self.custom_or_search(test)
         # dat = self.nan.obj_search('object')
         # if dat[0]:
@@ -786,7 +789,7 @@ class Path_Exe(object):
             if 0xFF == ord('q'):
                 break
 
-    def make_points(self, travel, xyz):
+    def make_points(self, travel, xyz, n):
         pts = []
         # xfyfzf = self.two_three_dim(travel[2][1])
         pts.append([[xyz[0]],
@@ -795,8 +798,8 @@ class Path_Exe(object):
         # estimated values found from bounding box while camera was on top of board
         kx = 1.4464
         ky = 1.5403
-        pts.append([[((travel[1][1][0]-640)*kx)/1000,((travel[1][1][0]-640)*kx)/1000,((travel[1][1][2]-640)*kx)/1000,((travel[1][1][2]-640)*kx)/1000],
-        [((-travel[1][1][1]+360)*ky)/1000,((-travel[1][1][3]+360)*ky)/1000,((-travel[1][1][1]+360)*ky)/1000,((-travel[1][1][3]+360)*ky)/1000],
+        pts.append([[((travel[n][1][0]-640)*kx)/1000,((travel[n][1][0]-640)*kx)/1000,((travel[n][1][2]-640)*kx)/1000,((travel[n][1][2]-640)*kx)/1000],
+        [((-travel[n][1][1]+360)*ky)/1000,((-travel[n][1][3]+360)*ky)/1000,((-travel[n][1][1]+360)*ky)/1000,((-travel[n][1][3]+360)*ky)/1000],
         [0,0,0,0]])
         return pts
 
@@ -870,42 +873,69 @@ class Path_Exe(object):
                     'angle4':end_angles[3], 'angle5':end_angles[4],'ultra_h':ultra_h_standin,'m_hx':4,'m_hy':4}
                 else:
                     print("F")
+        #  ------------------------------
+        print("end angles:",end_angles)
+        print("applied width:", applied_width)
+        return end_angles, applied_width
 
-    def path_exe(self, travel, overhead_poll, overhead_push, hand_poll, hand_push, sim_static, sim_live):
+    def path_to_above(self,travel,end_angles, sim_static, sim_live, gripper_width = 0.1, angle5 = 90, First=True):
         # use inverse kinematics to determine end effector postion
-        xyz = self.two_three_dim(travel[1][1])
+        if First:
+            xyz = self.two_three_dim(travel[1][1])
+            n = 1
+        elif not First:
+            xyz = self.two_three_dim(travel[2][1])
+            self.path.values['iA'] = end_angles
+            n = 2
+        print("Final Position: ", xyz)
         # define animation and stepper motor path
         # bool says whether object is within reach
-        angle5 = 90
         path, step_path, bool = self.path.find_path_to(xyz,angle5,False)
-        # stand-in for claw angle which will be found later
-        gripper_width = 0.1
         # needed for image orientation
         end_angles = [path[0][-1],path[1][-1],path[2][-1],path[3][-1], path[4][-1]]
-        print("end_angles: ", end_angles)
+        # print("end_angles: ", end_angles)
         # define object_info library
-        self.object_info = {'name':travel[1][0],
-        'over_A':((travel[1][1][0]-travel[1][1][2])*(travel[1][1][1]-travel[1][1][3])),
+
+        self.object_info = {'name':travel[n][0],
+        'over_A':((travel[n][1][0]-travel[n][1][2])*(travel[n][1][1]-travel[n][1][3])),
         'over_res':[720,1280]}
         # define state info
         # stand in for ultra sonic sensor
         ultra_h_standin = xyz[2] - 0.01
-        pts = self.make_points(travel,xyz)
+        # arranges static data for plot
+        pts = self.make_points(travel,xyz,n)
         state_info = {'xyz':[xyz[0],xyz[1],xyz[2]],
         'angle4':end_angles[3], 'angle5':end_angles[4],'ultra_h':ultra_h_standin,'m_hx':4,'m_hy':4}
         # pts = self.make_points(travel,xyz)
         static_pkg = {'goals':pts[0],'outline':pts[1]}
         if bool:
-            self.plotter = Plot(self.path.values['len'])
+            # self.plotter = Plot(self.path.values['len'])
             suite = []
             for x in range(0,len(path[0])):
                 post = self.plotter.position([path[0][x], path[1][x], path[2][x], path[3][x], path[4][x]],gripper_width)
                 suite.append(post)
             sim_live.put(suite)
             sim_static.put(static_pkg)
-            # polls hand camera for image
-            num_updates = 3
-            self.iterative_approach(num_updates,ultra_h_standin,path,xyz,state_info,pts,suite,gripper_width,sim_live,sim_static,hand_poll,hand_push)
+        else:
+            print("Couldn't Plot Path")
+
+        return bool, ultra_h_standin, path, xyz, state_info, pts, suite, gripper_width
+
+    def path_exe(self, travel, overhead_poll, overhead_push, hand_poll, hand_push, sim_static, sim_live):
+        end_angles = [0,0,0,0,0]
+        self.plotter = Plot(self.path.values['len'])
+        # bool, ultra_h_standin, path, xyz, state_info, pts, suite, gripper_width = self.path_to_above(travel,end_angles,sim_static, sim_live,
+        # gripper_width = 0.1, angle5 = 90, First=True)
+        bool = True
+        if bool:
+        #     # polls hand camera for image
+        #     num_updates = 3
+        #     end_angles,  hold_width = self.iterative_approach(num_updates, ultra_h_standin, path, xyz, state_info,
+        #     pts, suite, gripper_width, sim_live, sim_static, hand_poll, hand_push)
+            end_angles = [47.9046087198348, 75.1451334790116, 56.950257801153576, 41.46022589914221, 148.29253265243875]
+            gripper_width = 0.10301437144398834
+            bool1, ultra_h_standin1, path1, xyz1, state_info1, pts1, suite1, gripper_width1 = self.path_to_above(travel,end_angles,sim_static,
+            sim_live, gripper_width = gripper_width, angle5 = 90, First=False)
 
         else:
             pass
