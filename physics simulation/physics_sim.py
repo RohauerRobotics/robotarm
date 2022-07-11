@@ -7,13 +7,13 @@
 # Angela Sodemann (YouTuber) - homogenous transfer matricies
 # Matt O'Dell (Calc III Professor) - matricies practice
 # Kira Burt (Physics I & II Professor) - angular motion problems
+# Mark - inverse kinematics math
 # Damon Sisk (YouTuber) - motion profiles
 # Stewart Technologies (YouTuber) - motion profiles and joint interpolation
 
 # ----------------------------------
 
 import matplotlib.pyplot as plt
-import csv
 import numpy as np
 import time
 import mpl_toolkits.mplot3d.axes3d as p3
@@ -39,7 +39,7 @@ class Path(object):
 
 		# use the inverse kinematics function to
 		# find the final angles of each joint
-		final, bool = self.inverse_kinematics([0.15,-0.1,0.1])
+		final, bool = self.inverse_kinematics([0.15,0.01,0.125])
 
 		# if the arm is able to reach continue
 		if bool:
@@ -350,7 +350,7 @@ class Path(object):
 
 		# p is the number of divisions each path will
 		# broken up into
-		p = 45
+		p = 200
 		self.p = p
 		# R is the number of steps per stepper motor rotation
 		R = self.values['micro_steps']/(2*np.pi)
@@ -642,8 +642,8 @@ class Plot(object):
 		self.line4, = self.ax.plot(set[4][0], set[4][1], 'bo', linestyle='solid', color='red')
 		self.line5, = self.ax.plot(set[5][0], set[5][1], 'bo', linestyle='solid', color='red')
 
-		# loops animation 10 times
-		for x in range(0,11):
+		# loops animation 25 times
+		for x in range(0,26):
 			self.loop(path)
 
 	# define x axis rotation matrix
@@ -926,4 +926,4 @@ class Plot(object):
 			time.sleep(0.0001)
 
 path = Path([0,0,0,0.0], [0.20, 0.150, 0.050])
-plot = Plot(bob.path, [0.20, 0.150, 0.050], [0,0,0,0.0], path.t_time, path.p, path.divisions, path.accel)
+plot = Plot(path.path, [0.20, 0.150, 0.050], [0,0,0,0.0], path.t_time, path.p, path.divisions, path.accel)
