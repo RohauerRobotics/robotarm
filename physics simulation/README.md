@@ -1,4 +1,4 @@
-# Physics Sim
+# 3 Joint Robot Arm Physics Simulation
 By Dylan Rohauer
 ![alt text](https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/header_image.PNG?raw=True)
 
