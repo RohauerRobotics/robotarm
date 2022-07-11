@@ -1,3 +1,2 @@
-# robotarm
-Robot Arm Code
-is gonna be cool 
+# Robotic Arm Project
+Physics Simulation is working!
