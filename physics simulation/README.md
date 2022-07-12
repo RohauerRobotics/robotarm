@@ -27,3 +27,5 @@ Using our set acceleration, we can calculate the time it will take for each join
 # class Path - animation_path()
 
 In order for our animation to work we need to have a select number of snapshots of our path and be able to plot them. To do this animation_path creates a list of the angular values of all of the joints sampled throughout the duration of their motion. 
+![alt text](https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/path_sampling.png?raw=True)
+
