@@ -15,7 +15,7 @@ The first part of making a good simulation is knowing where your arm needs to be
 
 Now with these angles we can find the joint angles of the arm relative to one another.
 <p align="center">
-   <img src="https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/arm_angles.png" align="centre">
+   <img src="https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/arm_angles.png" align="centre" width="850">
  </p>
 
 Assuming the point is reachable we now have the first key nessisary to making our arm get to where it needs to go.
@@ -24,7 +24,7 @@ Assuming the point is reachable we now have the first key nessisary to making ou
 
 With the initial angles(declared either by the operator or the last position) we now want to find the time it would take for each motor to finish it's motion at maximum acceleration following the trapezoidal motion profile. The trapezoidal motion profile means that the motor will accelerate at a fixed rate for a period of time and then decelerate until it stops at the correct position. 
 <p align="center">
-   <img src="https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/motion_profile.png" align="centre">
+   <img src="https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/motion_profile.png" align="centre" width="850">
  </p>
 
 Using our set acceleration, we can calculate the time it will take for each joint to move from its initial position to it's end position. This is what the acceleration_path() function does, it also makes sure that the path it takes is the shortest one with some if statements. After each time to move has been calcutated, it selects the longest time and calculates what the acceleration would need to be for each joint for each to reach their final angular positions at the same time. 
@@ -33,7 +33,7 @@ Using our set acceleration, we can calculate the time it will take for each join
 
 In order for our animation to work we need to have a select number of snapshots of our path and be able to plot them. To do this animation_path creates a list of the angular values of all of the joints sampled throughout the duration of their motion. 
 <p align="center">
-   <img src="https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/path_sampling.png" align="centre">
+   <img src="https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/path_sampling.png" align="centre" width="850">
  </p>
 
 # class Plot - loop()
