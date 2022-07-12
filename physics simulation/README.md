@@ -19,4 +19,4 @@ Assuming the point is reachable we now have the first key nessisary to making ou
 
 class Path - acceleration_path()
 
-With the initial angles(declared either by the operator or the last position) we now want to find the time it would take for each motor to finish it's motion at maximum acceleration following the trapezoidal motion plan. The trapezoidal motion plan means that the motor will accelerate at a fixed rate for a period of time and then decelerate until it stops at the correct position. 
+With the initial angles(declared either by the operator or the last position) we now want to find the time it would take for each motor to finish it's motion at maximum acceleration following the trapezoidal motion profile. The trapezoidal motion profile means that the motor will accelerate at a fixed rate for a period of time and then decelerate until it stops at the correct position. 
