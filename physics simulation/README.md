@@ -24,3 +24,6 @@ With the initial angles(declared either by the operator or the last position) we
 
 Using our set acceleration, we can calculate the time it will take for each joint to move from its initial position to it's end position. This is what the acceleration_path() function does, it also makes sure that the path it takes is the shortest one with some if statements. After each time to move has been calcutated, it selects the longest time and calculates what the acceleration would need to be for each joint for each to reach their final angular positions at the same time. 
 
+# class Path - animation_path()
+
+In order for our animation to work we need to have a select number of snapshots of our path and be able to plot them. To do this animation_path creates a list of the angular values of all of the joints sampled throughout the duration of their motion. 
