@@ -14,7 +14,9 @@ The first part of making a good simulation is knowing where your arm needs to be
 ![alt text](https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/arm_triangle.png?raw=True)
 
 Now with these angles we can find the joint angles of the arm relative to one another.
-![alt text](https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/arm_angles.png?raw=True)
+<p align="center">
+   <img src="https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/arm_angles.png" align="centre">
+ </p>
 
 Assuming the point is reachable we now have the first key nessisary to making our arm get to where it needs to go.
 
