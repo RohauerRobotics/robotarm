@@ -44,6 +44,6 @@ Now that we have our samples of angles for the duration of the arm's travel, we 
 
 In order to go from angles to coordinates we must understand the relationships between points. To do this we use coordinate planes, coordinate planes give us relative relationships through which we can define a point or line's location. By creating multiple coordinate planes we can define the joints and end effector of our robot arm as the orgin of these coordinate systems. Then with several homogenous transfer matricies we can specify the displacement and rotation between points. So from simply the angles and lengths of the arm segments we can consistantly create the points in space which we need to represent our robot arm.
  <p align="center">
-   <img src="https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/rotation_matrix.png" align="centre" width="550" >
-  <img src="https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/frame_displacement.png" align="centre" width="550" >
+   <img src="https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/rotation_matrix.png" align="centre" width="500" >
+  <img src="https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/frame_displacement.png" align="centre" width="500" >
  </p>
