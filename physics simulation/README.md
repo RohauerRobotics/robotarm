@@ -29,3 +29,11 @@ Using our set acceleration, we can calculate the time it will take for each join
 In order for our animation to work we need to have a select number of snapshots of our path and be able to plot them. To do this animation_path creates a list of the angular values of all of the joints sampled throughout the duration of their motion. 
 ![alt text](https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/path_sampling.png?raw=True)
 
+# class Plot - loop()
+
+Now that we have our samples of angles for the duration of the arm's travel, we want to turn them from angles into coordinates. Loop is the function that brings everything together, it iterates through the list of samples and calls on the position function which gives it the coordinates and it in turn displays those coordinates on a matplotlib 3d display. 
+
+# class Plot - position() 
+
+In order to go from angles to coordinates we must understand the relationships between points. To do this we use coordinate planes, coordinate planes give us relative relationships through which we can define a point or line's location. By creating multiple coordinate planes we can define the joints and end effector of our robot arm as the orgin of these coordinate systems. Then with several homogenous transfer matricies we can specify the displacement and rotation between points. So from simply the angles and lengths of the arm segments we can consistantly create the points in space which we need to represent our robot arm.
+
