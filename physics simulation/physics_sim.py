@@ -7,7 +7,7 @@
 # Angela Sodemann (YouTuber) - homogenous transfer matricies
 # Matt O'Dell (Calc III Professor) - matricies practice
 # Kira Burt (Physics I & II Professor) - angular motion problems
-# Mark - inverse kinematics math
+# Mark Norman (EWU Student)- inverse kinematics math
 # Damon Sisk (YouTuber) - motion profiles
 # Stewart Technologies (YouTuber) - motion profiles and joint interpolation
 
@@ -20,6 +20,40 @@ import mpl_toolkits.mplot3d.axes3d as p3
 from mpl_toolkits import mplot3d
 import math
 
+# define constants for controlling robot arm
+
+# initial angles of the robot arm
+initial_angles = [0, 0, 0, 0]
+
+# length of the segments of the robot
+# arm (in meters)
+arm_segment_lengths = [0.20, 0.150, 0.050]
+
+# constant max angular velocity
+# (in radians/second)
+max_angular_velocity = np.pi
+
+# acceleration constant of stepper motors
+# (in radians/second*second)
+acceleration_constant = np.pi/8
+
+# goal point of end effector (x,y,z)
+# (in meters)
+goal_point = [0.15, 0, 0.125]
+
+# number of time samples
+num_samples = 50
+
+# point masses of arm
+# (in kilograms)
+point_masses = [0.15, 0.2, 0.4]
+
+# number of microsteps in each stepper motor
+microsteps = 200
+
+# print torques boolean
+print_torques = True
+
 # ----------------------------------
 # The class Path focuses on the creation of motion planning
 # including inverse kinematics, joint motion interpolation,
@@ -27,19 +61,20 @@ import math
 # ----------------------------------
 
 class Path(object):
-	def __init__(self, inital_angles,lengths_m):
+	def __init__(self, initial_angles, arm_segment_lengths, goal_point, num_samples, microsteps):
 		# define the initial angles of the arm
 		# define the # of microsteps needed to complete
 		# 1 rotation of the stepper motor
 		# define max angular velocity
 		# define max acceleration
-		self.values = {"iA":inital_angles, "len":lengths_m, "micro_steps":200, "w_max": np.pi, "accel":np.pi/8}
+		self.values = {"iA":initial_angles, "len": arm_segment_lengths, "w_max": np.pi, "accel":np.pi/8, "micro_steps":microsteps}
 		self.wa_max = self.values['w_max']
 		self.wc_max = self.values['w_max']
+		self.p = num_samples
 
 		# use the inverse kinematics function to
 		# find the final angles of each joint
-		final, bool = self.inverse_kinematics([0.15,0.01,0.125])
+		final, bool = self.inverse_kinematics(goal_point)
 
 		# if the arm is able to reach continue
 		if bool:
@@ -47,7 +82,7 @@ class Path(object):
 			# that all joints will reach the same place at the same
 			# time
 			self.accel, self.t_time = self.acceleration_path(self.values['iA'], final)
-			self.path, self.divisions = self.animation_path(self.values['iA'], final, self.accel)
+			self.path, self.divisions = self.animation_path(self.values['iA'], final, self.accel, self.t_time)
 
 	# takes a goal point and finds the angles of the
 	# robot arm required to meet that point with the
@@ -241,7 +276,8 @@ class Path(object):
 
 		# copy is made so stepper motor order can be preserved
 		copy = list(path)
-		print("Acceleation Path:", copy)
+		# print("Acceleation Path:", copy)
+
 		# sorts based on time, search crit specifies that
 		# the 0 index is the time varible
 		path.sort(key=self.search_crit, reverse=True)
@@ -262,7 +298,7 @@ class Path(object):
 				a = self.values['accel']
 			else:
 				pass
-		print("accel", accel)
+		# print("accel", accel)
 
 		return accel, t_time
 
@@ -342,16 +378,17 @@ class Path(object):
 
 	# determines the path a stepper motor will travel through to reach a
 	# certain goal point
-	def animation_path(self, inital, final, accel):
+	def animation_path(self, inital, final, accel, t_time):
 		# path will consist of a list of lists where
 		# each index of the path represents the list of
 		# angular values each joint will be at during the motion
 		path = [[],[],[],[]]
 
-		# p is the number of divisions each path will
-		# broken up into
-		p = 200
-		self.p = p
+		# # p is the number of divisions each path will
+		# # broken up into
+		# p = 200
+		# self.p = p
+
 		# R is the number of steps per stepper motor rotation
 		R = self.values['micro_steps']/(2*np.pi)
 
@@ -401,7 +438,7 @@ class Path(object):
 					# if there are 0 steps then the animation
 					# path will act as if there are 0
 					if steps == 0:
-						for x in range(1, p+1):
+						for x in range(1, self.p+1):
 							path[w].append(final[w])
 					else:
 						# finds total time
@@ -415,10 +452,13 @@ class Path(object):
 						if inital[w] == max(couple):
 							# print("Step A")
 
+							# if the angles are increasing the joint is accelerating towards the ground and is negative
+							self.accel[w] = -self.accel[w]
+
 							# iterate through the range of points defined by p
-							for x in range(1, p+1):
+							for x in range(1, self.p+1):
 								# t represents different increments of time
-								t = (x*(total_time/p))
+								t = (x*(total_time/self.p))
 
 								# print("iterated time:", t)
 								# print("trapezod function val:", np.degrees(self.trapezoid_function(t,angle,a,max_omega=maximum)))
@@ -428,16 +468,13 @@ class Path(object):
 								# returns the value of the angle at the specified time
 								path[w].append(inital[w]+np.degrees(self.trapezoid_function(t,angle,a,max_omega=maximum)))
 
-								# if the angles are increasing the joint is accelerating towards the ground and is negative
-								self.accel[w] = -self.accel[w]
-
 						# if the final angle is max then the shortest path is
 						# away from it
 						elif final[w] == max(couple):
 							# print("Step B")
-							for x in range(1, p+1):
+							for x in range(1, self.p+1):
 								# t represents different increments of time
-								t = (x*(total_time/p))
+								t = (x*(total_time/self.p))
 
 								# print("iterated time:", t)
 								# print("trapezod function val:", np.degrees(self.trapezoid_function(t,angle,a,max_omega=maximum)))
@@ -472,7 +509,7 @@ class Path(object):
 					# print("maximum: ", maximum)
 
 					if steps == 0:
-						for x in range(1, p+1):
+						for x in range(1, self.p+1):
 							path[w].append(final[w])
 					else:
 						# total time is found
@@ -490,9 +527,9 @@ class Path(object):
 							# print("Step C")
 
 							# iterate through time to find path
-							for x in range(1, p+1):
+							for x in range(1, self.p+1):
 								# time incrimentally found
-								t = (x*(total_time/p))
+								t = (x*(total_time/self.p))
 								# print("iterated time:", t)
 
 								# print("trapezod function val:", np.degrees(self.trapezoid_function(t,angle,a,max_omega=maximum)))
@@ -507,9 +544,9 @@ class Path(object):
 						elif final[w] == max(couple):
 							# print("Step D")
 
-							for x in range(1, p+1):
+							for x in range(1, self.p+1):
 								# time incrimentally found
-								t = (x*(total_time/p))
+								t = (x*(total_time/self.p))
 
 								# print("iterated time:", t)
 								# print("trapezod function val:",np.degrees(self.trapezoid_function(t,angle,a,max_omega=maximum)))
@@ -524,8 +561,9 @@ class Path(object):
 			# if the inital and final angles are the same
 			# then no distance is travelled
 			elif (final[w]==inital[w]):
-				path[w].append(final[w])
-
+				for x in range(1, self.p+1):
+					path[w].append(final[w])
+				divisions[w] = [t_time,0,0]
 				# print("appended 0")
 
 			else:
@@ -599,12 +637,10 @@ class Path(object):
 # ----------------------------------
 
 class Plot(object):
-	def __init__(self, path, lengths_m, inital_angles, t_time, p, divisions, accel):
+	def __init__(self, path, lengths_m, inital_angles, t_time, p, divisions, accel, print_torques):
 		# define stepper settings
 		self.values = {"iA":inital_angles, "len":lengths_m,
-		"micro_steps":200, "w_max": np.pi, "accel":np.pi/8,
-		"mass": [0.15,0.2,0.4]
-		}
+		"w_max": np.pi, "accel":np.pi/8, "mass": [0.15,0.2,0.4]}
 		# define class variable versions of arm segments
 		self.l1 = lengths_m[0]
 		self.l2 = lengths_m[1]
@@ -614,6 +650,7 @@ class Plot(object):
 		self.t_time = t_time
 		self.accel = accel
 		self.divisions = divisions
+		self.print_torques = print_torques
 
 		# declare plt is interactive
 		plt.ion()
@@ -630,7 +667,7 @@ class Plot(object):
 		self.ax.set_zlim3d([0.0, 500])
 		self.ax.set_zlabel('Z')
 		#
-		self.ax.set_title('3D Test')
+		self.ax.set_title('Robot Arm Physics Simulation')
 
 		# set serves as empy lists for defining lines
 		# to be plotted
@@ -884,9 +921,10 @@ class Plot(object):
 		self.stepper2_torque(t)
 		self.stepper3_torque(t)
 
-		# print("Stepper 1 Torque Magnitude:",round(np.sqrt((self.orgin_t[0]**2)+(self.orgin_t[1]**2)+(self.orgin_t[2]**2)),3),"Nm")
-		# print("Stepper 2 Torque Magnitude:",round(np.sqrt((self.motor2_t[0]**2)+(self.motor2_t[1]**2)+(self.motor2_t[2]**2)),3),"Nm")
-		# print("Stepper 3 Torque Magnitude:",round(np.sqrt((self.motor3_t[0]**2)+(self.motor3_t[1]**2)+(self.motor3_t[2]**2)),3),"Nm")
+		if self.print_torques:
+			print("Stepper 1 Torque Magnitude:",round(np.sqrt((self.orgin_t[0]**2)+(self.orgin_t[1]**2)+(self.orgin_t[2]**2)),3),"Nm")
+			print("Stepper 2 Torque Magnitude:",round(np.sqrt((self.motor2_t[0]**2)+(self.motor2_t[1]**2)+(self.motor2_t[2]**2)),3),"Nm")
+			print("Stepper 3 Torque Magnitude:",round(np.sqrt((self.motor3_t[0]**2)+(self.motor3_t[1]**2)+(self.motor3_t[2]**2)),3),"Nm")
 
 	# runs the simulation
 	def loop(self, path):
@@ -925,5 +963,5 @@ class Plot(object):
 			self.fig.canvas.flush_events()
 			time.sleep(0.0001)
 
-path = Path([0,0,0,0.0], [0.20, 0.150, 0.050])
-plot = Plot(path.path, [0.20, 0.150, 0.050], [0,0,0,0.0], path.t_time, path.p, path.divisions, path.accel)
+path = Path(initial_angles, arm_segment_lengths, goal_point, num_samples, microsteps)
+plot = Plot(path.path, arm_segment_lengths, initial_angles, path.t_time, num_samples, path.divisions, path.accel, print_torques)
