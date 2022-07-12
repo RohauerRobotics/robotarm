@@ -8,6 +8,7 @@ This is a physics simulation of a three joint robot arm that I am in the process
 This project can be broken up into two classes, each solving essesential parts of the simulation.
 
 class Path
-The class Path performs a few essential functions. The first of which is inverse kinematics, this is the process of taking a point input and computing the angles of the robot arm required for the end effector to meet this goal position.
+
+The first part of making a good simulation is knowing where your arm needs to be. The goal for my arm is to eventually pick up an object located with image recognition and move it to a desired position. In order to go from a point in space to knowing the angles your joints need to be at you need inverse kinematics. Knowing the lengths of the arm segments and the position of the end effector you can calculate the angles nessary to reach this point. The following image shows the first step of this process which is to determine the interior angles of the triangle which represents the first two segments of the robot arm.
 ![alt text](https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/arm_triangle.png?raw=True)
 
