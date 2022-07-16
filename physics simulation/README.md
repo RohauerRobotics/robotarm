@@ -51,3 +51,7 @@ In order to go from angles to coordinates we must understand the relationships b
 # class Plot - stepperx_torque()
 
 Now that we have the points in space which define our robot arm, we can now move into doing the physics of this simulation. Torque is defined by a force at a distance (or the cross product of position by force) so to estimate the torque required by each stepper motor I used point masses in conjunction with each elbow location. The two primary torques that any stepper motor will experience come from the force of gravity acting upon the point masses and the rotational acceleration from the motor acting on the point masses.
+<p align="center">
+   <img src="https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/torque_gravity.png" align="centre" width="500" >
+  <img src="https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/torque_rotation.png" align="centre" width="450" >
+ </p>
