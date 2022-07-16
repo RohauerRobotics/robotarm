@@ -3,14 +3,14 @@ By Dylan Rohauer
  <p align="center">
    <img src="https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/header_image.PNG" align="centre">
  </p>
-This is a physics simulation of a three joint robot arm that I am in the process of making. The purpose of this simulation was originally just to estimate the torque requirement on the stepper motors but it has turned into a fully animated 3D simulation. This simulation is still in development and has become a crutial component of my robot design, providing verification for the image recognition and path planning. This is a version modified from the current working version to demonstrate serveral capabilities, but I may continue development of this a seperate project.
+This is a physics simulation of a three joint robot arm that I am in the process of making. The purpose of this simulation was originally just to estimate the torque requirement on the stepper motors but it has turned into a fully animated 3D simulation. This simulation is still in development and has become a crucial component of my robot design, providing verification for the image recognition and path planning. This is a version modified from the current working version to demonstrate several capabilities, but I may continue development of this as a separate project.
 
 # Core Functions
-This project can be broken up into two classes, each solving essesential parts of the simulation.
+This project can be broken up into two classes, each solving essential parts of the simulation.
 
 # class Path - inverse_kinematics()
 
-The first part of making a good simulation is knowing where your arm needs to be. The goal for my arm is to eventually pick up an object located with image recognition and move it to a desired position. In order to go from a point in space to knowing the angles your joints need to be at you need inverse kinematics. Knowing the lengths of the arm segments and the position of the end effector you can calculate the angles nessary to reach this point. The following image shows the first step of this process which is to determine the interior angles of the triangle which represents the first two segments of the robot arm.
+The first part of making a good simulation is knowing where your arm needs to be. The goal for my arm is to eventually pick up an object located with image recognition and move it to a desired position. In order to go from a point in space to knowing the angles your joints need to be at you need inverse kinematics. Knowing the lengths of the arm segments and the position of the end effector you can calculate the angles necessary to reach this point. The following image shows the first step of this process which is to determine the interior angles of the triangle which represents the first two segments of the robot arm.
 ![alt text](https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/arm_triangle.png?raw=True)
 
 Now with these angles we can find the joint angles of the arm relative to one another.
@@ -18,16 +18,16 @@ Now with these angles we can find the joint angles of the arm relative to one an
    <img src="https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/arm_angles.png" align="centre" >
  </p>
 
-Assuming the point is reachable we now have the first key nessisary to making our arm get to where it needs to go.
+Assuming the point is reachable we now have the first key necessary to making our arm get to where it needs to go.
 
 # class Path - acceleration_path()
 
-With the initial angles(declared either by the operator or the last position) we now want to find the time it would take for each motor to finish it's motion at maximum acceleration following the trapezoidal motion profile. The trapezoidal motion profile means that the motor will accelerate at a fixed rate for a period of time and then decelerate until it stops at the correct position. 
+With the initial angles (declared either by the operator or the last position) we now want to find the time it would take for each motor to finish its motion at maximum acceleration following the trapezoidal motion profile. The trapezoidal motion profile means that the motor will accelerate at a fixed rate for a period of time and then decelerate until it stops at the correct position. 
 <p align="center">
    <img src="https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/motion_profile.png" align="centre" >
  </p>
 
-Using our set acceleration, we can calculate the time it will take for each joint to move from its initial position to it's end position. This is what the acceleration_path() function does, it also makes sure that the path it takes is the shortest one with some if statements. After each time to move has been calcutated, it selects the longest time and calculates what the acceleration would need to be for each joint for each to reach their final angular positions at the same time. 
+Using our set acceleration, we can calculate the time it will take for each joint to move from its initial position to its end position. This is what the acceleration_path() function does, it also makes sure that the path it takes is the shortest one with some if statements. After each time to move has been calculated, it selects the longest time and calculates what the acceleration would need to be for each joint for each to reach their final angular positions at the same time. 
 
 # class Path - animation_path()
 
@@ -42,8 +42,12 @@ Now that we have our samples of angles for the duration of the arm's travel, we 
 
 # class Plot - position() 
 
-In order to go from angles to coordinates we must understand the relationships between points. To do this we use coordinate planes, coordinate planes give us relative relationships through which we can define a point or line's location. By creating multiple coordinate planes we can define the joints and end effector of our robot arm as the orgin of these coordinate systems. Then with several homogenous transfer matricies we can specify the displacement and rotation between points. So from simply the angles and lengths of the arm segments we can consistantly create the points in space which we need to represent our robot arm.
+In order to go from angles to coordinates we must understand the relationships between points. To do this we use coordinate planes, coordinate planes give us relative relationships through which we can define a point or line's location. By creating multiple coordinate planes we can define the joints and end effector of our robot arm as the origin of these coordinate systems. Then with several homogeneous transfer matrices we can specify the displacement and rotation between points. So from simply the angles and lengths of the arm segments we can consistently create the points in space which we need to represent our robot arm.
  <p align="center">
    <img src="https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/rotation_matrix.png" align="centre" width="500" >
   <img src="https://github.com/RohauerRobotics/robotarm/blob/working/physics%20simulation/images/frame_displacement.png" align="centre" width="500" >
  </p>
+
+# class Plot - stepperx_torque()
+
+Now that we have the points in space which define our robot arm, we can now move into doing the physics of this simulation. Torque is defined by a force at a distance (or the cross product of position by force) so to estimate the torque required by each stepper motor I used point masses in conjunction with each elbow location. The two primary torques that any stepper motor will experience come from the force of gravity acting upon the point masses and the rotational acceleration from the motor acting on the point masses.
