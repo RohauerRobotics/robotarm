@@ -1,4 +1,4 @@
-import cv2
+stepper.STEPimport cv2
 import io
 import socket
 import struct
@@ -11,7 +11,7 @@ from multiprocessing import Lock, Process, Queue, current_process
 import queue
 # packages for multiplexing and interfacing with hardware
 import board
-import busio
+import busio9
 import adafruit_tca9548a
 import digitalio as dg
 
@@ -211,9 +211,14 @@ class States(object):
         # define class variable for socket communication
         connection =  Client()
 
+        # define class variable for communication with the magnetic encoder
+        encoder = MagEncoder()
+
+        # define class variable for stepper motor operation
+        stepper = StepperMovement()
+
         # define hardware interface pins
         self.initialize_pins()
-        self.initialize_multiplexer()
 
         # self.
         # define queues for passing information between threads
@@ -245,42 +250,6 @@ class States(object):
             p.join()
 
     def initialize_pins(self):
-        # stepper 1
-        self.DIR1 = dg.DigitalInOut(board.D4)
-        self.DIR1.direction = dg.Direction.OUTPUT
-        self.STEP1 = dg.DigitalInOut(board.D17)
-        self.STEP1.direction = dg.Direction.OUTPUT
-
-        # stepper 2
-        self.DIR2 = dg.DigitalInOut(board.D27)
-        self.DIR2.direction = dg.Direction.OUTPUT
-        self.STEP2 = dg.DigitalInOut(board.D22)
-        self.STEP2.direction = dg.Direction.OUTPUT
-
-        # stepper 3
-        self.DIR3 = dg.DigitalInOut(board.D10)
-        self.DIR3.direction = dg.Direction.OUTPUT
-        self.STEP3 = dg.DigitalInOut(board.D9)
-        self.STEP3.direction = dg.Direction.OUTPUT
-
-        # stepper 4
-        self.DIR4 = dg.DigitalInOut(board.D11)
-        self.DIR4.direction = dg.Direction.OUTPUT
-        self.STEP4 = dg.DigitalInOut(board.D0)
-        self.STEP4.direction = dg.Direction.OUTPUT
-
-        # stepper 5
-        self.DIR5 = dg.DigitalInOut(board.D5)
-        self.DIR5.direction = dg.Direction.OUTPUT
-        self.STEP5 = dg.DigitalInOut(board.D6)
-        self.STEP5.direction = dg.Direction.OUTPUT
-
-        # stepper 6
-        self.DIR6 = dg.DigitalInOut(board.D13)
-        self.DIR6.direction = dg.Direction.OUTPUT
-        self.STEP6 = dg.DigitalInOut(board.D19)
-        self.STEP6.direction = dg.Direction.OUTPUT
-
         # ultrasonic sensor
         self.TRIG = dg.DigitalInOut(board.D25)
         self.TRIG.direction = dg.Direction.OUTPUT
@@ -316,86 +285,6 @@ class States(object):
         # hall effect sensor 6
         self.HALL6 = dg.DigitalInOut(board.D24)
         self.HALL6.direction = dg.Direction.INPUT
-
-    def initialize_multiplexer(self):
-        # define i2c connection to multiplexer
-        self.i2c = (busio.I2C(board.SCL, board.SDA, 400))
-        time.sleep(0.1)
-        self.tca = adafruit_tca9548a.TCA9548A(self.i2c)
-
-        # make list of connected encoders
-        self.encoder_verify = {0:None, 1:None, 2:None, 3:None, 4:None, 5:None}
-        for key in self.encoder_verify.keys():
-            q = key
-            if self.tca[q].try_lock():
-                address = self.tca[q].scan()
-                print("Found",hex(address[0]))
-                print("Raw address:", address[0])
-                self.tca[q].unlock()
-                if hex(address[0]) == hex(54):
-                    self.encoder_verify[key] = True
-                else:
-                    self.encoder_verify[key] = False
-            else:
-                self.encoder_verify[key] = False
-
-        print(f"Encoders lib: {self.encoder_verify}")
-
-    def read_angles(self):
-        lib = {'a1':None, 'a2':None, 'a3':None, 'a4':None, 'a5':None, 'a6':None}
-
-        for key in self.encoder_verify.keys():
-            q = key
-            # print(q)
-            if self.encoder_verify[key]:
-                print(f"Indexing: {q}")
-                angle_count = 0
-                angle_list = []
-                for x in range(0, 2):
-                    if self.check_magnent_noprint(q):
-                        angle_list.append(self.read_angle_raw(q))
-                        angle_count += 1
-                    else:
-                        print("No Magnent Detected!")
-                idx = "a" + str(q+1)
-                if sum(angle_list) != 0:
-                    avg = sum(angle_list)/angle_count
-                    lib[idx] = avg
-                else:
-                    lib[idx] = None
-            else:
-                pass
-        # print(lib)
-        return lib
-
-    def read_angle_raw(self, address):
-        angleHigh_buff = bytearray(2)
-        mstat_address = bytes([0x0D])
-        if self.tca[address].try_lock():
-            self.tca[address].writeto(0x36, mstat_address, stop=False)
-            time.sleep(0.05)
-            self.tca[address].readfrom_into(0x36, angleHigh_buff)
-            # angleHigh_buff = angleHigh_buff << 8;
-            # print("High angle",angleHigh_buff[1])
-            angleLow_buff = bytearray(2)
-            mstat_address = bytes([0x0C])
-            self.tca[address].writeto(0x36, mstat_address, stop=False)
-            time.sleep(0.05)
-            self.tca[address].readfrom_into(0x36, angleLow_buff)
-            high = angleHigh_buff[1:2]
-            low = angleLow_buff[1:2]
-            # print(high)
-            rawangle = struct.pack('cc',bytes(high),bytes(low))
-            # rawangle.append(int(bytes(angleLow_buff[1:2])))
-            # print(low)
-            int_angle = int.from_bytes(rawangle,"big")
-            float_angle = int_angle*0.087890625
-            print(float_angle)
-            self.tca[address].unlock()
-            return(float_angle)
-        else:
-            print(f"Couldn't Lock {address}!")
-            return(0)
 
     def ultrasonic_distance(self):
         # set Trigger to HIGH
@@ -440,202 +329,114 @@ class States(object):
         print(f"Ultrasonic Distance: {distance}")
         return distance
 
-    def check_magnent_noprint(self, address):
-        # collects raw angle from
-        data_buffer_in = bytearray(1)
-        # print("Checking Magnent Status")
-        while(bytearray.decode(data_buffer_in) != 'g'):
-            data_buffer_in = bytearray(1)
-            mstat_address = bytes([0x0B])
-            if self.tca[address].try_lock():
-                self.tca[address].writeto(0x36, mstat_address, stop=False)
-                time.sleep(0.005)
-                self.tca[address].readfrom_into(0x36, data_buffer_in)
-                self.tca[address].unlock()
-            else:
-                pass
-            # print("Magnent Status", bytearray.decode(data_buffer_in))
-        # print("Magnent Detected")
-        return True
-
-    def find_encoder_direction(self):
-        self.angle_dirs = [None, None, None, None, None, None]
-        self.first_dirs = [None, None, None, None, None, None]
-
-        for key in self.encoder_verify.keys():
-            if self.encoder_verify[key] == True:
-                exit_dir = None
-                dir_sample = []
-                num_samples = 6
-                delay = 0.05
-
-                if not self.halls[key].value:
-                    print("Hall Sensor Detected while finding direction!")
-                    for x in range(1, 250):
-                        # print(f"Hall Value: {self.halls[key].value}")
-                        # print(f"Num of Steps: {x}")
-
-                        self.dirs[key].value = True
-                        self.step(self.steps[key], x, delay)
-
-                        if self.halls[key].value:
-                            exit_dir = True
-                            break
-
-                        else:
-                            self.dirs[key].value = False
-                            self.step(self.steps[key], x, delay)
-
-                        self.dirs[key].value = False
-                        self.step(self.steps[key], x, delay)
-
-                        if self.halls[key].value:
-                            exit_dir = False
-                            break
-
-                        else:
-                            self.dirs[key].value = True
-                            self.step(self.steps[key], x, delay)
-
-                if exit_dir == None:
-                    for q in range(0, num_samples):
-                        # print(f"hall sensor: {halls[key].value}")
-                        if self.halls[key].value:
-                            self.dirs[key].value = True
-                            self.steps[key].value = True
-                            time.sleep(delay)
-                            self.steps[key].value = False
-                            time.sleep(delay)
-
-                            if self.check_magnent_noprint(key):
-                                dir_sample.append(self.read_angle_raw(key))
-                            else:
-                                print("No Magnent Detected")
-
-                        elif not self.halls[key].value:
-                            if self.check_magnent_noprint(key):
-                                self.stop_1[key] = self.read_angle_raw(key)
-                                self.first_dirs[key] = True
-                            else:
-                                print("No Magnent Detected")
-                            break
-
-
-
-                elif exit_dir != None:
-                    self.step(self.steps[key], 45, delay)
-                    for q in range(0, num_samples):
-                        # print(f"hall sensor: {halls[key].value}")
-                        if self.halls[key].value:
-                            self.dirs[key].value = True
-                            self.steps[key].value = True
-                            time.sleep(delay)
-                            self.steps[key].value = False
-                            time.sleep(delay)
-
-                            if self.check_magnent_noprint(key):
-                                dir_sample.append(self.read_angle_raw(key))
-                            else:
-                                print("No Magnent Detected")
-
-                        elif not self.halls[key].value:
-                            if self.check_magnent_noprint(key):
-                                self.stop_1[key] = self.read_angle_raw(key)
-                                self.first_dirs[key] = True
-                            else:
-                                print("No Magnent Detected")
-                            break
-
-                for i in range(0, num_samples-1):
-                    a = dir_sample[i]
-                    b = dir_sample[i + 1]
-                    if abs(b-a) < 2.5:
-                        if b > a:
-                            self.angle_dirs[key] = "positive"
-                        elif b < a:
-                            self.angle_dirs[key] = "negative"
-                        else:
-                            pass
-                    else:
-                        pass
-            else:
-                pass
-
-    def step(self, stepper, num_steps, delay):
-        for x in range(0, num_steps):
-            stepper.value = True
-            time.sleep(delay)
-            stepper.value = False
-            time.sleep(delay)
+    # magnetic encoder initialization
 
     def zero_steppers(self):
         print("zeroing steppers")
         # define lists for processing all of the joint zeroing
-        self.dirs = [self.DIR1, self.DIR2, self.DIR3, self.DIR4, self.DIR5, self.DIR6]
-        self.steps = [self.STEP1, self.STEP2, self.STEP3, self.STEP4, self.STEP5, self.STEP6]
+        self.dirs = [stepper.DIR1, stepper.DIR2, stepper.DIR3, stepper.DIR4, stepper.DIR5, stepper.DIR6]
+        self.steps = [self.STEP1, stepper.STEP2, stepper.STEP3, stepper.STEP4, stepper.STEP5, stepper.STEP6]
         self.halls = [self.HALL1, self.HALL2, self.HALL3, self.HALL4, self.HALL5, self.HALL6]
 
         # define stop_1, stop_2, angle direction, and first direction
-        self.stop_1 = [None, None, None, None, None, None]
-        self.stop_2 = [None, None, None, None, None, None]
-        self.angle_dirs = [None, None, None, None, None, None]
-        self.first_dirs = [None, None, None, None, None, None]
+        stop_1 = [None, None, None, None, None, None]
+        stop_2 = [None, None, None, None, None, None]
 
         # set 2nd encoder verification to False to speed up test
-        self.encoder_verify[2] = False
+        encoder.encoder_verify[2] = False
 
-        # determine angle_dirs
-        self.find_encoder_direction()
-        # print(f"angle dirs: {self.angle_dirs}")
+        self.ssl = [None, None, None, None, None, None]
+        # self.get_off_together()
 
         # move steppers to the first stopping points
-        delay = 0.05
-        for key in self.encoder_verify.keys():
-            if self.encoder_verify[key] == True:
-                for q in range(0, 2000):
+        delay = 0.0025
+        extra_delay = 0.00
+        for key in encoder.encoder_verify.keys():
+            if encoder.encoder_verify[key] == True:
+
+                if encoder.check_magnent_noprint(key):
+                    encoder.num_turns[key] = encoder.read_angle_raw(key)
+                    initial_quadrant = encoder.find_quadrant(encoder.num_turns[key])
+                else:
+                    print("No Magnent")
+
+                for q in range(0, 4000):
                     print("count: ", q)
 
                     if self.halls[key].value:
                         self.dirs[key].value = True
-                        self.step(self.steps[key], 1, delay)
+                        print(f"Forwards Value: {self.dirs[key].value}")
+                        stepper.step(self.steps[key], 1, delay)
+                        time.sleep(extra_delay)
 
                     elif not self.halls[key].value:
-                        if self.check_magnent_noprint(key):
-                            self.stop_1[key] = self.read_angle_raw(key)
-                            self.first_dirs[key] = True
+                        if encoder.check_magnent_noprint(key):
+                            current_angle = encoder.read_angle_raw(key)
+                            stop_1[key], encoder.num_turns[key], encoder.last_quadrant[key] = encoder.find_total_angle(current_angle,
+                                                    encoder.num_turns[key], encoder.num_turns[key], initial_quadrant)
+                            time.sleep(1)
+
                         else:
                             print("No Magnent 1")
                         break
 
-        # print(f"List of Stop 1s: {self.stop_1}")
+        # print(f"List of Stop 1s: {stop_1}")
 
-        for key in self.encoder_verify.keys():
-            if self.encoder_verify[key] == True:
-
-                for w in range(0, 45):
+        for key in encoder.encoder_verify.keys():
+            if encoder.encoder_verify[key] == True:
+                for w in range(0, 35):
+                    print(f"Backing Up: {w}")
                     self.dirs[key].value = False
-                    self.step(self.steps[key], 1, delay)
+                    print(f"Backwards Value: {self.dirs[key].value}")
+                    stepper.step(self.steps[key], 1, delay)
+                    time.sleep(extra_delay)
 
-                for q in range(0, 2000):
+                time.sleep(1)
+                for q in range(0, 4000):
                     print("count: ", q)
 
                     if self.halls[key].value:
                         self.dirs[key].value = False
-                        self.step(self.steps[key], 1, delay)
+                        stepper.step(self.steps[key], 1, delay)
+                        time.sleep(extra_delay)
 
                     elif not self.halls[key].value:
-                        if self.check_magnent_noprint(key):
-                            self.stop_2[key] = self.read_angle_raw(key)
+                        if encoder.check_magnent_noprint(key):
+                            current_angle = encoder.read_angle_raw(key)
+                            stop_2[key], encoder.num_turns[key], encoder.last_quadrant[key] = encoder.find_total_angle(current_angle,
+                                                    encoder.num_turns[key], encoder.num_turns[key], encoder.last_quadrant[key])
+                            time.sleep(1)
                         else:
                             print("No Magnent 1")
                         break
 
-        print(f"List of Stop 1s: {self.stop_1}")
-        print(f"List of Stops: {self.stop_2}")
-        print(f"angle dirs: {self.angle_dirs}")
+        print(f"List of Stop 1s: {stop_1}")
+        print(f"List of Stop 2s: {stop_2}")
 
-    def follow_path(self, path):
-        print("Following path:", path)
+        for i in range(0, len(stop_1)):
+            if (stop_1[i] != None) & (stop_2[i] != None):
+                full_range = abs(stop_1[i]-stop_2[i])
+                if stop_2[i] > stop_1[i]:
+                    goal = 0.5*full_range
+                    encoder.adjustment[i] = goal - stop_2[i]
+                elif stop_2[i] < stop_1[i]:
+                    goal = -0.5*full_range
+                    encoder.adjustment[i] = goal - stop_2
+
+        print(f"Angle adjustment: {encoder.adjustment}")
+
+        # check to make sure this is working
+        for key in encoder.encoder_verify.keys():
+            if encoder.encoder_verify[key]:
+                if encoder.check_magnent_noprint(key):
+                    verify = encoder.read_angle_raw(key)
+                    # quadrant = self.find_quadrant(verify)
+                    read_angle, encoder.num_turns, encoder.last_quadrant = encoder.find_total_angle(verify, encoder.start_angle[key], encoder.num_turns[key], encoder.last_quadrant[key], adjustment=encoder.adjustment[key])
+                    print(f"Official Stepper {key} Total Angle: {read_angle}")
+
+        # print(f"angle dirs: {self.angle_dirs}")
+
+    # state executers
 
     def execute_movement(self, movement_instructions, state, state_request, initialization):
         print("executing movement")
@@ -657,7 +458,8 @@ class States(object):
             if not state_request.empty():
                 request = state_request.get()
                 print(request)
-                lib = self.read_angles()
+
+                lib = encoder.read_angles()
 
                 # get an average sample from ultrasonic sensor
                 self.ultra_count = 0
@@ -679,6 +481,326 @@ class States(object):
             else:
                 pass
 
+class MagEncoder(object):
+    def __init__(self):
+        print("Initializing Magnetic Encoder")
+        # define boolean for initialization
+        self.INITIALIZED = False
+
+        # define variables for zeroing magntic encoders
+        self.num_turns = [0, 0, 0, 0, 0, 0]
+        self.start_angle = [None, None, None, None, None, None]
+        self.last_quadrant = [None, None, None, None, None, None]
+        self.adjustment = [None, None, None, None, None, None]
+
+        # define number of encoder samples for providing state
+        self.num_samples = 2
+
+        self.initialize_multiplexer()
+
+    def initialize_multiplexer(self):
+        # define i2c connection to multiplexer
+        self.i2c = (busio.I2C(board.SCL, board.SDA, 400))
+        time.sleep(0.1)
+        self.tca = adafruit_tca9548a.TCA9548A(self.i2c)
+
+        # make list of connected encoders
+        self.encoder_verify = {0:None, 1:None, 2:None, 3:None, 4:None, 5:None}
+        for key in self.encoder_verify.keys():
+            q = key
+            if self.tca[q].try_lock():
+                address = self.tca[q].scan()
+                print("Found",hex(address[0]))
+                print("Raw address:", address[0])
+                self.tca[q].unlock()
+                if hex(address[0]) == hex(54):
+                    self.encoder_verify[key] = True
+                else:
+                    self.encoder_verify[key] = False
+            else:
+                self.encoder_verify[key] = False
+
+        print(f"Encoders lib: {self.encoder_verify}")
+
+    def read_angles(self):
+        lib = {'a1':None, 'a2':None, 'a3':None, 'a4':None, 'a5':None, 'a6':None}
+        if self.INITIALIZED == True:
+            for key in self.encoder_verify.keys():
+                q = key
+                # print(q)
+                if self.encoder_verify[key]:
+                    print(f"Indexing: {q}")
+                    angle_count = 0
+                    angle_list = []
+                    for x in range(1, self.num_samples + 1):
+                        if self.check_magnent_noprint(q):
+                            current_angle = self.read_angle_raw(q)
+                            read_angle, self.num_turns[key], self.last_quadrant[key] = encoder.find_total_angle(current_angle, self.start_angle[key], self.num_turns[key], self.last_quadrant[key], adjustment=self.adjustment[key])
+                            angle_list.append(read_angle)
+                            angle_count += 1
+                        else:
+                            print("No Magnent Detected!")
+                    idx = "a" + str(q+1)
+                    if sum(angle_list) != 0:
+                        avg = sum(angle_list)/angle_count
+                        lib[idx] = avg
+                    else:
+                        lib[idx] = None
+                else:
+                    pass
+        else:
+            print("Cannot Return Angles because initialization process hasn't occured")
+        # print(lib)
+        return lib
+
+    def read_angle_raw(self, address):
+        angleHigh_buff = bytearray(2)
+        mstat_address = bytes([0x0D])
+        if self.tca[address].try_lock():
+            self.tca[address].writeto(0x36, mstat_address, stop=False)
+            time.sleep(0.05)
+            self.tca[address].readfrom_into(0x36, angleHigh_buff)
+            # angleHigh_buff = angleHigh_buff << 8;
+            # print("High angle",angleHigh_buff[1])
+            angleLow_buff = bytearray(2)
+            mstat_address = bytes([0x0C])
+            self.tca[address].writeto(0x36, mstat_address, stop=False)
+            time.sleep(0.05)
+            self.tca[address].readfrom_into(0x36, angleLow_buff)
+            high = angleHigh_buff[1:2]
+            low = angleLow_buff[1:2]
+            # print(high)
+            rawangle = struct.pack('cc',bytes(high),bytes(low))
+            # rawangle.append(int(bytes(angleLow_buff[1:2])))
+            # print(low)
+            int_angle = int.from_bytes(rawangle,"big")
+            float_angle = int_angle*0.087890625
+            # print(float_angle)
+            self.tca[address].unlock()
+            return(float_angle)
+        else:
+            print(f"Couldn't Lock {address}!")
+            return(0)
+
+    def check_magnent_noprint(self, address):
+        # collects raw angle from
+        data_buffer_in = bytearray(1)
+        # print("Checking Magnent Status")
+        while(bytearray.decode(data_buffer_in) != 'g'):
+            data_buffer_in = bytearray(1)
+            mstat_address = bytes([0x0B])
+            if self.tca[address].try_lock():
+                self.tca[address].writeto(0x36, mstat_address, stop=False)
+                time.sleep(0.005)
+                self.tca[address].readfrom_into(0x36, data_buffer_in)
+                self.tca[address].unlock()
+            else:
+                pass
+            # print("Magnent Status", bytearray.decode(data_buffer_in))
+        # print("Magnent Detected")
+        return True
+
+    def find_quadrant(self, corrected_angle):
+        if (0 <= corrected_angle <= 90):
+            quadrant = 1
+        elif (90 < corrected_angle <= 180):
+            quadrant = 2
+        elif (180 < corrected_angle <= 270):
+            quadrant = 3
+        elif (270 < corrected_angle < 360):
+            quadrant = 4
+
+        return quadrant
+
+    def find_total_angle(self, current_angle, start_angle, num_turns, last_quadrant, adjustment=None):
+        corrected_angle = current_angle - start_angle
+
+        if corrected_angle < 0:
+            corrected_angle = corrected_angle + 360
+        else:
+            pass
+
+        # if adjustment != None:
+        #     corrected_angle += adjustment
+
+        quadrant = self.find_quadrant(corrected_angle)
+
+        if quadrant != last_quadrant:
+            if (quadrant == 1) & (last_quadrant == 4):
+                num_turns += 1
+            elif (quadrant == 4) & (last_quadrant == 1):
+                num_turns -= 1
+            else:
+                pass
+        total_angle = (num_turns*360) + corrected_angle
+
+        if adjustment != None:
+            total_angle += adjustment
+
+
+        return total_angle, num_turns, quadrant
+
+class StepperMovement(object):
+    def __init__(self):
+        print("Initializing stepper motor control")
+        # stepper 1
+        self.DIR1 = dg.DigitalInOut(board.D4)
+        self.DIR1.direction = dg.Direction.OUTPUT
+        self.STEP1 = dg.DigitalInOut(board.D17)
+        self.STEP1.direction = dg.Direction.OUTPUT
+
+        # stepper 2
+        self.DIR2 = dg.DigitalInOut(board.D27)
+        self.DIR2.direction = dg.Direction.OUTPUT
+        self.STEP2 = dg.DigitalInOut(board.D22)
+        self.STEP2.direction = dg.Direction.OUTPUT
+
+        # stepper 3
+        self.DIR3 = dg.DigitalInOut(board.D10)
+        self.DIR3.direction = dg.Direction.OUTPUT
+        self.STEP3 = dg.DigitalInOut(board.D9)
+        self.STEP3.direction = dg.Direction.OUTPUT
+
+        # stepper 4
+        self.DIR4 = dg.DigitalInOut(board.D11)
+        self.DIR4.direction = dg.Direction.OUTPUT
+        self.STEP4 = dg.DigitalInOut(board.D0)
+        self.STEP4.direction = dg.Direction.OUTPUT
+
+        # stepper 5
+        self.DIR5 = dg.DigitalInOut(board.D5)
+        self.DIR5.direction = dg.Direction.OUTPUT
+        self.STEP5 = dg.DigitalInOut(board.D6)
+        self.STEP5.direction = dg.Direction.OUTPUT
+
+        # stepper 6
+        self.DIR6 = dg.DigitalInOut(board.D13)
+        self.DIR6.direction = dg.Direction.OUTPUT
+        self.STEP6 = dg.DigitalInOut(board.D19)
+        self.STEP6.direction = dg.Direction.OUTPUT
+
+    def step_sequence(self, num_steps, long_delay, short_delay, buffer):
+        short_delay_list = []
+        long_delay_list = []
+        for w in range(1, num_steps+1):
+            temp_short = (short_delay*w)
+            temp_long_less_one = (long_delay*(w-1))
+            temp_long = (long_delay*w)
+            short_delay_list.append(temp_short + temp_long_less_one + buffer)
+            long_delay_list.append(temp_long + temp_short + buffer)
+
+        return short_delay_list, long_delay_list
+
+    def get_off_together(self):
+        begin = time.time()
+        for key in self.encoder_verify.keys():
+            if self.encoder_verify[key]:
+                sequence_plan = {"dir":None,
+                                "after_F":None,
+                                "after_T":None,
+                                "steps": 1,
+                                "last": None,
+                                "finished":None}
+                self.ssl[key] = sequence_plan
+
+            else:
+                pass
+
+        # finished_list = [self.ssl[0]['finished']]
+        delay = 0.005
+        short_delay = 0.0005
+        condition = (not self.halls[0].value) & (not self.ssl[0]["finished"])
+        while condition:
+            current = time.time()
+            elapsed = current - begin
+            print(f"Time: {elapsed}")
+
+            for key in self.encoder_verify.keys():
+                if self.encoder_verify[key]:
+                    if not self.halls[key].value:
+                        # first step
+                        if (self.ssl[key]['dir'] == None) & (self.ssl[key]['last'] == None):
+                            self.ssl[key]['dir'] = True
+                            self.ssl[key]['last'] = True
+                            self.ssl[key]["after_F"], self.ssl[key]["after_T"] = self.step_sequence(self.ssl[key]["steps"], delay, short_delay, elapsed)
+                            print(f"First Direction")
+
+                        # second step
+                        elif (self.ssl[key]['last'] == True) & (len(self.ssl[key]["after_F"]) == 0) & (len(self.ssl[key]["after_T"]) == 0):
+                            self.ssl[key]["dir"] = False
+                            self.ssl[key]['last'] = False
+                            self.ssl[key]["steps"] = self.ssl[key]["steps"] + 1
+                            self.ssl[key]["after_F"], self.ssl[key]["after_T"] = self.step_sequence(self.ssl[key]["steps"], delay, short_delay, elapsed)
+                            print(f"Second Direction")
+
+
+                        # third step --> repeats original direction (add step)
+                        elif (self.ssl[key]['last'] == False) & (len(self.ssl[key]["after_F"]) == 0) & (len(self.ssl[key]["after_T"]) == 0):
+                            self.ssl[key]["dir"] = True
+                            self.ssl[key]['last'] = True
+                            self.ssl[key]["steps"] = self.ssl[key]["steps"] + 1
+                            self.ssl[key]["after_F"], self.ssl[key]["after_T"] = self.step_sequence(self.ssl[key]["steps"], delay, short_delay, elapsed)
+                            print(f"Third Direction")
+
+                    elif self.halls[key].value:
+                        if self.ssl[key]["steps"] != 15:
+                            self.ssl[key]["steps"] = 15
+                            self.ssl[key]["after_F"], self.ssl[key]["after_T"] = self.step_sequence(self.ssl[key]["steps"], delay, short_delay, elapsed)
+
+                        elif (len(self.ssl[key]["after_F"])==0) & (len(self.ssl[key]["after_T"])==0):
+                            self.ssl[key]["finished"] = True
+                    else:
+                        pass
+
+
+            # elapsed = current - begin
+
+            for key in self.encoder_verify.keys():
+                if self.encoder_verify[key]:
+                    # set direction pin
+                    self.dirs[key] = self.ssl[key]['dir']
+                    # print(f"After T : {self.ssl[key]['after_T']}")
+                    # print(f"After F : {self.ssl[key]['after_F']}")
+
+                    # set values to true when lens are the same
+                    if (len(self.ssl[key]['after_T']) == len(self.ssl[key]['after_F'])) & (len(self.ssl[key]['after_F']) != 0):
+                        self.steps[key].value = True
+                        print("Step1")
+                        if elapsed >= self.ssl[key]['after_T'][0]:
+                            self.ssl[key]['after_T'].pop(0)
+                            self.steps[key].value = False
+                            print("step 2")
+
+                        else:
+                            pass
+
+
+                    # check to see if time has elasped from short delays first
+                    # if len(self.ssl[key]['after_T']) > len(self.ssl[key]['after_F']):
+                    #     if elapsed >= self.ssl[key]['after_T'][0]:
+                    #         self.ssl[key]['after_T'].pop(0)
+                    #         self.steps[key].value = False
+                    #         print("step 2")
+
+                    elif len(self.ssl[key]['after_T']) < len(self.ssl[key]['after_F']):
+                        if elapsed >= self.ssl[key]['after_F'][0]:
+                            self.ssl[key]['after_F'].pop(0)
+                        else:
+                            pass
+                else:
+                    pass
+
+            time.sleep(0.01)
+
+    def step(self, stepper, num_steps, delay):
+        for x in range(0, num_steps):
+            stepper.value = True
+            time.sleep(0.00075)
+            stepper.value = False
+            time.sleep(delay)
+
+    def follow_path(self, path):
+        print("Following path:", path)
 
 
 if __name__=="__main__":
